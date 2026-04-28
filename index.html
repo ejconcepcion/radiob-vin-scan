@@ -498,10 +498,12 @@ async function toggleScanner() {
   // Step 3: start ZXing
   try {
     codeReader = new ZXing.BrowserBarcodeReader();
-    const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
-    // prefer rear camera
-    const rearDevice = devices.find(d => /back|rear|environment/i.test(d.label));
-    const deviceId = rearDevice ? rearDevice.deviceId : (devices.length > 0 ? devices[devices.length - 1].deviceId : undefined);
+
+    // listVideoInputDevices was removed in newer ZXing — use native API instead
+    const allDevices = await navigator.mediaDevices.enumerateDevices();
+    const videoDevices = allDevices.filter(d => d.kind === 'videoinput');
+    const rearDevice = videoDevices.find(d => /back|rear|environment/i.test(d.label));
+    const deviceId = rearDevice ? rearDevice.deviceId : (videoDevices.length > 0 ? videoDevices[videoDevices.length - 1].deviceId : undefined);
 
     await codeReader.decodeFromVideoDevice(deviceId, 'preview', function(result, err) {
       if (result) {
