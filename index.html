@@ -450,7 +450,7 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.6.2</footer>
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.6.3</footer>
 </div>
 
 <script>
@@ -590,41 +590,74 @@ function handleBarcodePhoto(file) {
     ocrBar.style.width = '20%';
     ocrStatus.textContent = 'Scanning for barcode...';
 
+    // Use BrowserMultiFormatReader which handles still images correctly
+    var codeReader = new ZXing.BrowserMultiFormatReader();
     var img = new Image();
     img.onload = function() {
-      var canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      var ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-
       try {
-        var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        var zxingReader = new ZXing.MultiFormatReader();
+        var canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+
         var hints = new Map();
         hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
           ZXing.BarcodeFormat.CODE_39,
           ZXing.BarcodeFormat.CODE_128
         ]);
-        zxingReader.setHints(hints);
-        var luminanceSource = new ZXing.RGBLuminanceSource(imageData.data, canvas.width, canvas.height);
-        var binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
-        var result = zxingReader.decode(binaryBitmap);
-        var vin = result.getText().replace(/[^A-Z0-9]/gi, '').toUpperCase();
+        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
 
-        if (vin.length === 17 && !/[IOQ]/.test(vin)) {
-          ocrBar.style.width = '100%';
-          ocrStatus.textContent = '✓ Barcode found!';
-          document.getElementById('vinInput').value = vin;
-          setTimeout(function() { ocrProgress.classList.remove('visible'); }, 800);
-          decodeVIN(vin);
-        } else {
-          ocrStatus.textContent = 'No valid VIN barcode found. Try VIN Text mode instead.';
+        var reader2 = new ZXing.MultiFormatReader();
+        reader2.setHints(hints);
+
+        // Try original + 90° rotation (barcodes may be sideways in photo)
+        var angles = [0, 90, 270, 180];
+        var found = false;
+
+        for (var a = 0; a < angles.length; a++) {
+          try {
+            var rotCanvas = document.createElement('canvas');
+            var angle = angles[a];
+            if (angle === 90 || angle === 270) {
+              rotCanvas.width = canvas.height;
+              rotCanvas.height = canvas.width;
+            } else {
+              rotCanvas.width = canvas.width;
+              rotCanvas.height = canvas.height;
+            }
+            var rctx = rotCanvas.getContext('2d');
+            rctx.translate(rotCanvas.width/2, rotCanvas.height/2);
+            rctx.rotate(angle * Math.PI / 180);
+            rctx.drawImage(canvas, -canvas.width/2, -canvas.height/2);
+
+            var luminance = new ZXing.RGBLuminanceSource(
+              rctx.getImageData(0, 0, rotCanvas.width, rotCanvas.height).data,
+              rotCanvas.width, rotCanvas.height
+            );
+            var bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
+            var result = reader2.decode(bitmap);
+            var vin = result.getText().replace(/[^A-Z0-9]/gi, '').toUpperCase();
+
+            if (vin.length === 17 && !/[IOQ]/.test(vin)) {
+              ocrBar.style.width = '100%';
+              ocrStatus.textContent = '✓ Barcode found!';
+              document.getElementById('vinInput').value = vin;
+              setTimeout(function() { ocrProgress.classList.remove('visible'); }, 800);
+              decodeVIN(vin);
+              found = true;
+              break;
+            }
+          } catch(e2) { /* try next rotation */ }
+        }
+
+        if (!found) {
           ocrBar.style.width = '0%';
+          ocrStatus.textContent = 'No barcode detected. Switch to 🔤 VIN Text mode and try again.';
         }
       } catch(e) {
-        ocrStatus.textContent = 'No barcode detected. Try VIN Text mode or manual entry.';
         ocrBar.style.width = '0%';
+        ocrStatus.textContent = 'No barcode detected. Switch to 🔤 VIN Text mode and try again.';
       }
     };
     img.src = ev.target.result;
