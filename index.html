@@ -11,7 +11,7 @@
 <meta http-equiv="Expires" content="0">
 <title>RadioB VIN Scan</title>
 <script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
-<script src="https://unpkg.com/tesseract.js@4.1.4/dist/tesseract.min.js"></script>
+<script src="https://unpkg.com/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
 <style>
   :root {
     --bg: #f5f5f5;
@@ -450,7 +450,7 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.6.3</footer>
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.6.4</footer>
 </div>
 
 <script>
@@ -681,19 +681,22 @@ function handleOcrPhoto(file) {
     ocrBar.style.width = '10%';
     ocrStatus.textContent = 'Loading OCR engine...';
 
-    Tesseract.createWorker('eng', Tesseract.OEM.LSTM_ONLY, {
+    Tesseract.recognize(ev.target.result, 'eng', {
       logger: function(m) {
         if (m.status === 'recognizing text') {
           ocrBar.style.width = Math.round(10 + m.progress * 85) + '%';
           ocrStatus.textContent = 'Reading text... ' + Math.round(m.progress * 100) + '%';
+        } else if (m.status === 'loading tesseract core') {
+          ocrStatus.textContent = 'Loading OCR engine...';
+          ocrBar.style.width = '15%';
+        } else if (m.status === 'initializing tesseract') {
+          ocrStatus.textContent = 'Initializing...';
+          ocrBar.style.width = '20%';
+        } else if (m.status === 'loading language traineddata') {
+          ocrStatus.textContent = 'Loading language data...';
+          ocrBar.style.width = '25%';
         }
       }
-    }).then(function(worker) {
-      return worker.recognize(ev.target.result).then(function(result) {
-        return worker.terminate().then(function() {
-          return result;
-        });
-      });
     }).then(function(result) {
       ocrBar.style.width = '100%';
       ocrStatus.textContent = 'Scanning for VIN pattern...';
@@ -714,7 +717,7 @@ function handleOcrPhoto(file) {
       }
     }).catch(function(err) {
       ocrProgress.classList.remove('visible');
-      var msg = (err && err.message) ? err.message : 'Unknown error';
+      var msg = (err && err.message) ? err.message : JSON.stringify(err);
       showStatus('error', 'OCR error: ' + msg);
       console.error('OCR error:', err);
     }).finally(function() {
