@@ -10,7 +10,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>RadioB VIN Scan</title>
-<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
+<script src="https://unpkg.com/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
 <script src="https://unpkg.com/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
 <style>
   :root {
@@ -547,11 +547,10 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.3.4</footer>
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.4.0</footer>
 </div>
 
 <script>
-let codeReader = null;
 let scanning = false;
 
 const HISTORY_KEY = 'radiob_vin_history';
@@ -766,62 +765,81 @@ async function toggleScanner() {
   btn.textContent = 'Starting camera...';
   btn.disabled = true;
 
-  // Step 1: explicitly request camera permission first
-  let stream = null;
+  // Test permission first with explicit getUserMedia
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    const testStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    testStream.getTracks().forEach(t => t.stop());
   } catch(permErr) {
     btn.textContent = 'Activate Scanner';
     btn.disabled = false;
     if (permErr.name === 'NotAllowedError' || permErr.name === 'PermissionDeniedError') {
-      showStatus('error', 'Camera permission denied. Go to your browser Settings → Site Settings → Camera and allow this site, then refresh the page.');
+      showStatus('error', 'Camera permission denied. Go to Settings → Site Settings → Camera, allow this site, then refresh.');
     } else if (permErr.name === 'NotFoundError') {
       showStatus('error', 'No camera found on this device.');
     } else if (permErr.name === 'NotReadableError') {
-      showStatus('error', 'Camera is in use by another app. Close other apps using the camera and try again.');
+      showStatus('error', 'Camera is in use by another app. Close other apps and try again.');
     } else {
       showStatus('error', 'Could not access camera: ' + permErr.message);
     }
     return;
   }
 
-  // Step 2: stop the test stream — ZXing will open its own
-  stream.getTracks().forEach(t => t.stop());
+  // Start Quagga2 — purpose-built for 1D barcodes like Code 39 (VIN format)
+  Quagga.init({
+    inputStream: {
+      name: 'Live',
+      type: 'LiveStream',
+      target: document.getElementById('preview').parentElement,
+      constraints: {
+        facingMode: 'environment',
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      },
+    },
+    decoder: {
+      readers: ['code_39_reader', 'code_128_reader'],
+      multiple: false
+    },
+    locate: true,
+    locator: {
+      patchSize: 'medium',
+      halfSample: true
+    }
+  }, function(err) {
+    if (err) {
+      btn.textContent = 'Activate Scanner';
+      btn.disabled = false;
+      showStatus('error', 'Scanner failed to start: ' + err + '. Try refreshing the page.');
+      return;
+    }
 
-  // Step 3: start ZXing
-  try {
-    codeReader = new ZXing.BrowserBarcodeReader();
-
-    // listVideoInputDevices was removed in newer ZXing — use native API instead
-    const allDevices = await navigator.mediaDevices.enumerateDevices();
-    const videoDevices = allDevices.filter(d => d.kind === 'videoinput');
-    const rearDevice = videoDevices.find(d => /back|rear|environment/i.test(d.label));
-    const deviceId = rearDevice ? rearDevice.deviceId : (videoDevices.length > 0 ? videoDevices[videoDevices.length - 1].deviceId : undefined);
-
-    await codeReader.decodeFromVideoDevice(deviceId, 'preview', function(result, err) {
-      if (result) {
-        const vin = result.getText().replace(/[^A-Z0-9]/gi,'').toUpperCase();
-        if (vin.length === 17) { stopScanner(); document.getElementById('vinInput').value = vin; decodeVIN(vin); }
-      }
-    });
-
+    Quagga.start();
     scanning = true;
+
+    // Hide placeholder, show overlay
     document.getElementById('placeholder').style.display = 'none';
     document.getElementById('scanOverlay').style.display = 'flex';
     document.getElementById('scannerHint').style.display = 'block';
     btn.textContent = 'Stop Scanner';
     btn.classList.add('scanning');
     btn.disabled = false;
+  });
 
-  } catch(e) {
-    btn.textContent = 'Activate Scanner';
-    btn.disabled = false;
-    showStatus('error', 'Scanner failed to start: ' + e.message + '. Try refreshing the page.');
-  }
+  // Listen for successful decode
+  Quagga.onDetected(function(result) {
+    if (!scanning) return;
+    const raw = result.codeResult.code;
+    const vin = raw.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+    if (vin.length === 17 && !/[IOQ]/.test(vin)) {
+      stopScanner();
+      document.getElementById('vinInput').value = vin;
+      decodeVIN(vin);
+    }
+  });
 }
 
 function stopScanner() {
-  if (codeReader) { codeReader.reset(); codeReader = null; }
+  try { Quagga.stop(); } catch(e) {}
   scanning = false;
   const btn = document.getElementById('scanBtn');
   btn.textContent = 'Activate Scanner';
@@ -829,7 +847,12 @@ function stopScanner() {
   document.getElementById('scanOverlay').style.display = 'none';
   document.getElementById('scannerHint').style.display = 'none';
   document.getElementById('placeholder').style.display = 'flex';
-  document.getElementById('preview').srcObject = null;
+  // Quagga injects its own video — clean it up
+  const viewport = document.querySelector('.scanner-viewport');
+  const quaggaVideo = viewport ? viewport.querySelector('video') : null;
+  if (quaggaVideo) quaggaVideo.remove();
+  const quaggaCanvas = viewport ? viewport.querySelector('canvas.drawingBuffer') : null;
+  if (quaggaCanvas) quaggaCanvas.remove();
 }
 
 function useSample(vin) { document.getElementById('vinInput').value = vin; decodeVIN(vin); }
