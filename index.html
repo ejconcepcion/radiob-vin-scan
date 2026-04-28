@@ -501,9 +501,12 @@
           <div class="ocr-status" id="ocrStatus">Initializing OCR...</div>
         </div>
 
-        <!-- Camera debug -->
-        <button id="listCamerasBtn" style="margin-top:8px;padding:6px 10px;font-size:11px;background:#fff;border:1px solid #ddd;border-radius:6px;color:#888;cursor:pointer;width:100%;">🔎 List Available Cameras</button>
-        <div id="cameraDebug" style="margin-top:6px;font-size:11px;color:#555;background:#f9f9f9;border:1px solid #eee;border-radius:6px;padding:8px;display:none;word-break:break-all;line-height:1.6;"></div>
+        <!-- Camera selector -->
+        <div id="cameraSelectorWrap" style="margin-top:8px;display:none;">
+          <div style="font-size:11px;color:#888;margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Select Camera</div>
+          <select id="cameraSelect" style="width:100%;padding:7px 10px;font-size:12px;border:1px solid #ddd;border-radius:6px;background:#fff;color:#333;"></select>
+        </div>
+        <button id="listCamerasBtn" style="margin-top:8px;padding:6px 10px;font-size:11px;background:#fff;border:1px solid #ddd;border-radius:6px;color:#888;cursor:pointer;width:100%;">🔎 Choose Camera</button>
       </div>
     </div>
   </div>
@@ -554,7 +557,7 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.4.9</footer>
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.5.0</footer>
 </div>
 
 <script>
@@ -678,17 +681,19 @@ async function captureAndRead() {
     try {
       captureBtn.textContent = 'Starting camera...';
       captureBtn.disabled = true;
-      // Pick wide-angle camera — prefer "camera 0" (main lens)
-      let ocrDeviceId = null;
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter(d => d.kind === 'videoinput');
-        const backCams = videoDevices.filter(d => /facing back/i.test(d.label));
-        const cam0 = backCams.find(d => /camera 0/i.test(d.label));
-        const cam2 = backCams.find(d => /camera 2/i.test(d.label));
-        const chosen = cam0 || cam2 || backCams[0];
-        ocrDeviceId = chosen ? chosen.deviceId : null;
-      } catch(e) {}
+      // Use manually selected camera if set, otherwise auto-detect wide angle
+      let ocrDeviceId = selectedDeviceId;
+      if (!ocrDeviceId) {
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoDevices = devices.filter(d => d.kind === 'videoinput');
+          const backCams = videoDevices.filter(d => /facing back/i.test(d.label));
+          const cam0 = backCams.find(d => /camera 0/i.test(d.label));
+          const cam2 = backCams.find(d => /camera 2/i.test(d.label));
+          const chosen = cam0 || cam2 || backCams[0];
+          ocrDeviceId = chosen ? chosen.deviceId : null;
+        } catch(e) {}
+      }
 
       const ocrConstraints = ocrDeviceId
         ? { deviceId: { exact: ocrDeviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
@@ -776,31 +781,49 @@ async function captureAndRead() {
 }
 
 
-// ── CAMERA DEBUG ─────────────────────────────────────────
-async function listCameras() {
-  const box = document.getElementById('cameraDebug');
-  box.style.display = 'block';
-  box.textContent = 'Requesting permission to enumerate cameras...';
+let selectedDeviceId = null; // manually chosen camera
 
-  // Must get permission first or labels will be empty
+// ── CAMERA SELECTOR ──────────────────────────────────────
+async function listCameras() {
+  const wrap = document.getElementById('cameraSelectorWrap');
+  const select = document.getElementById('cameraSelect');
+  const btn = document.getElementById('listCamerasBtn');
+
+  btn.textContent = 'Loading cameras...';
+
+  // Need permission first so labels are populated
   try {
     const s = await navigator.mediaDevices.getUserMedia({ video: true });
     s.getTracks().forEach(t => t.stop());
   } catch(e) {
-    box.textContent = 'Permission denied: ' + e.message;
+    btn.textContent = '🔎 Choose Camera';
+    showStatus('error', 'Camera permission needed to list cameras.');
     return;
   }
 
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const cams = devices.filter(d => d.kind === 'videoinput');
-    if (!cams.length) { box.textContent = 'No cameras found.'; return; }
-    box.innerHTML = '<b>' + cams.length + ' camera(s) found:</b><br><br>' +
-      cams.map(function(c, i) {
-        return '<b>#' + i + '</b> ' + (c.label || '(no label)') + '<br><small>' + c.deviceId.substring(0,20) + '...</small>';
-      }).join('<br><br>');
+
+    select.innerHTML = cams.map(function(c, i) {
+      return '<option value="' + c.deviceId + '">' + (c.label || 'Camera ' + i) + '</option>';
+    }).join('');
+
+    // Pre-select currently chosen camera if any
+    if (selectedDeviceId) select.value = selectedDeviceId;
+
+    wrap.style.display = 'block';
+    btn.textContent = '✓ Apply Selected Camera';
+
+    select.onchange = function() {
+      selectedDeviceId = select.value;
+      // Restart scanner if currently running
+      if (scanning) { stopScanner(); toggleScanner(); }
+    };
+
   } catch(e) {
-    box.textContent = 'Error: ' + e.message;
+    btn.textContent = '🔎 Choose Camera';
+    showStatus('error', 'Could not list cameras: ' + e.message);
   }
 }
 
@@ -835,27 +858,20 @@ async function toggleScanner() {
     return;
   }
 
-  // Enumerate cameras and pick the wide-angle rear camera
-  // On multi-lens phones, avoid telephoto by picking the first back camera
-  // (telephoto lenses appear later in the device list)
-  let preferredDeviceId = null;
-  try {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const videoDevices = devices.filter(d => d.kind === 'videoinput');
-
-    // Priority order: camera 0 (main) > camera 2 (ultrawide) > camera 3 (telephoto)
-    // Explicitly avoid front-facing and telephoto
-    const backCams = videoDevices.filter(d => /facing back/i.test(d.label));
-
-    // Prefer "camera 0" which is typically the main wide lens
-    const cam0 = backCams.find(d => /camera 0/i.test(d.label));
-    const cam2 = backCams.find(d => /camera 2/i.test(d.label));
-    const fallback = backCams[0];
-
-    const chosen = cam0 || cam2 || fallback;
-    preferredDeviceId = chosen ? chosen.deviceId : null;
-    console.log('Selected camera:', chosen ? chosen.label : 'none');
-  } catch(e) {}
+  // Use manually selected camera if set, otherwise auto-detect wide angle
+  let preferredDeviceId = selectedDeviceId;
+  if (!preferredDeviceId) {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(d => d.kind === 'videoinput');
+      const backCams = videoDevices.filter(d => /facing back/i.test(d.label));
+      const cam0 = backCams.find(d => /camera 0/i.test(d.label));
+      const cam2 = backCams.find(d => /camera 2/i.test(d.label));
+      const chosen = cam0 || cam2 || backCams[0];
+      preferredDeviceId = chosen ? chosen.deviceId : null;
+      console.log('Selected camera:', chosen ? chosen.label : 'none');
+    } catch(e) {}
+  }
 
   // Start Quagga2 — purpose-built for 1D barcodes like Code 39 (VIN format)
   const quaggaConstraints = preferredDeviceId
