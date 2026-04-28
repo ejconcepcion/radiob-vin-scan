@@ -500,6 +500,10 @@
           <div class="ocr-bar-wrap"><div class="ocr-bar" id="ocrBar"></div></div>
           <div class="ocr-status" id="ocrStatus">Initializing OCR...</div>
         </div>
+
+        <!-- Camera debug -->
+        <button id="listCamerasBtn" style="margin-top:8px;padding:6px 10px;font-size:11px;background:#fff;border:1px solid #ddd;border-radius:6px;color:#888;cursor:pointer;width:100%;">🔎 List Available Cameras</button>
+        <div id="cameraDebug" style="margin-top:6px;font-size:11px;color:#555;background:#f9f9f9;border:1px solid #eee;border-radius:6px;padding:8px;display:none;word-break:break-all;line-height:1.6;"></div>
       </div>
     </div>
   </div>
@@ -550,7 +554,7 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.4.5</footer>
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.4.7</footer>
 </div>
 
 <script>
@@ -769,6 +773,34 @@ async function captureAndRead() {
   }
 }
 
+
+// ── CAMERA DEBUG ─────────────────────────────────────────
+async function listCameras() {
+  const box = document.getElementById('cameraDebug');
+  box.style.display = 'block';
+  box.textContent = 'Requesting permission to enumerate cameras...';
+
+  // Must get permission first or labels will be empty
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({ video: true });
+    s.getTracks().forEach(t => t.stop());
+  } catch(e) {
+    box.textContent = 'Permission denied: ' + e.message;
+    return;
+  }
+
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cams = devices.filter(d => d.kind === 'videoinput');
+    if (!cams.length) { box.textContent = 'No cameras found.'; return; }
+    box.innerHTML = '<b>' + cams.length + ' camera(s) found:</b><br><br>' +
+      cams.map(function(c, i) {
+        return '<b>#' + i + '</b> ' + (c.label || '(no label)') + '<br><small>' + c.deviceId.substring(0,20) + '...</small>';
+      }).join('<br><br>');
+  } catch(e) {
+    box.textContent = 'Error: ' + e.message;
+  }
+}
 
 async function toggleScanner() {
   const btn = document.getElementById('scanBtn');
@@ -1039,6 +1071,7 @@ if (window.screen && window.screen.orientation) {
 
 renderHistory();
 fixVideoOrientation();
+document.getElementById('listCamerasBtn').addEventListener('click', listCameras);
 </script>
 </body>
 </html>
