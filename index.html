@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a0a0f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>RadioB VIN Scan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
+<style>
+  :root {
+    --bg: #07080d;
+    --surface: #0e1018;
+    --surface2: #141620;
+    --border: #1e2235;
+    --accent: #3b8eff;
+    --accent2: #1a5fff;
+    --cyan: #00d4ff;
+    --text: #d8dde8;
+    --muted: #5a6080;
+    --success: #22c55e;
+    --error: #ef4444;
+    --glow: rgba(59, 142, 255, 0.15);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Barlow', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    padding-bottom: 40px;
+  }
+
+  header {
+    padding: 20px 20px 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 42px; height: 42px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+    box-shadow: 0 0 20px rgba(59,142,255,0.4);
+  }
+
+  .logo-text { display: flex; flex-direction: column; }
+
+  .logo-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700; font-size: 22px;
+    letter-spacing: 3px; text-transform: uppercase; color: #fff;
+  }
+
+  .logo-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px; color: var(--cyan); letter-spacing: 2px; margin-top: -2px;
+  }
+
+  .card {
+    margin: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), transparent);
+  }
+
+  .scanner-section { padding: 20px; }
+
+  .section-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px; letter-spacing: 3px; color: var(--cyan);
+    text-transform: uppercase; margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .scanner-viewport {
+    position: relative; background: #000; border-radius: 12px;
+    overflow: hidden; aspect-ratio: 4/3; border: 1px solid var(--border);
+  }
+
+  #preview { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  .scan-overlay {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+
+  .scan-frame { position: relative; width: 75%; height: 28%; }
+
+  .scan-frame::before, .scan-frame::after, .corner-br, .corner-bl {
+    content: ''; position: absolute; width: 24px; height: 24px;
+    border-color: var(--accent); border-style: solid;
+  }
+
+  .scan-frame::before { top:0; left:0; border-width:3px 0 0 3px; border-radius:4px 0 0 0; }
+  .scan-frame::after  { top:0; right:0; border-width:3px 3px 0 0; border-radius:0 4px 0 0; }
+  .corner-br { bottom:0; right:0; border-width:0 3px 3px 0; border-radius:0 0 4px 0; }
+  .corner-bl { bottom:0; left:0; border-width:0 0 3px 3px; border-radius:0 0 0 4px; }
+
+  .scan-line {
+    position: absolute; left: 0; right: 0; height: 2px; top: 50%;
+    background: linear-gradient(90deg, transparent, var(--accent), var(--cyan), var(--accent), transparent);
+    box-shadow: 0 0 8px var(--cyan);
+    animation: scanMove 2s ease-in-out infinite;
+  }
+
+  @keyframes scanMove {
+    0%,100% { transform: translateY(-20px); opacity:.6; }
+    50% { transform: translateY(20px); opacity:1; }
+  }
+
+  .scanner-hint {
+    position: absolute; bottom: 12px; left: 0; right: 0; text-align: center;
+    font-family: 'Share Tech Mono', monospace; font-size: 11px;
+    color: rgba(255,255,255,0.5); letter-spacing: 1px;
+  }
+
+  .camera-placeholder {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; color: var(--muted);
+  }
+
+  .camera-placeholder svg { opacity: 0.4; }
+  .camera-placeholder span { font-size: 13px; text-align: center; padding: 0 20px; line-height: 1.5; }
+
+  .btn-scan {
+    width: 100%; margin-top: 14px; padding: 14px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none; border-radius: 10px;
+    font-family: 'Rajdhani', sans-serif; font-weight: 700;
+    font-size: 16px; letter-spacing: 3px; text-transform: uppercase;
+    color: #000; cursor: pointer; transition: all 0.2s;
+  }
+
+  .btn-scan:active { transform: scale(0.98); }
+  .btn-scan:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-scan.scanning {
+    background: linear-gradient(135deg, #1a2a1a, #0a1a0a);
+    color: var(--success); border: 1px solid var(--success);
+  }
+
+  .divider {
+    display: flex; align-items: center; gap: 12px;
+    padding: 4px 20px 12px; color: var(--muted);
+    font-size: 12px; font-family: 'Share Tech Mono', monospace; letter-spacing: 2px;
+  }
+
+  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .manual-section { padding: 0 20px 20px; }
+
+  .input-wrap { display: flex; gap: 10px; }
+
+  .vin-input {
+    flex: 1; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 16px;
+    font-family: 'Share Tech Mono', monospace; font-size: 14px;
+    color: var(--text); letter-spacing: 2px; text-transform: uppercase;
+    outline: none; transition: border-color 0.2s;
+  }
+
+  .vin-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--glow); }
+  .vin-input::placeholder { color: var(--muted); letter-spacing: 1px; text-transform: none; font-size: 12px; }
+
+  .btn-decode {
+    padding: 12px 20px; background: var(--surface2);
+    border: 1px solid var(--accent); border-radius: 10px;
+    color: var(--accent); font-family: 'Rajdhani', sans-serif;
+    font-weight: 700; font-size: 14px; letter-spacing: 2px;
+    cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  }
+
+  .btn-decode:hover { background: var(--glow); }
+  .btn-decode:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .status-card {
+    margin: 0 16px 16px; padding: 16px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; display: none;
+  }
+
+  .status-card.visible { display: block; }
+  .status-card.loading { border-color: var(--cyan); }
+  .status-card.error { border-color: var(--error); background: rgba(239,68,68,0.05); }
+  .status-card.success { border-color: var(--success); }
+
+  .loading-content { display: flex; align-items: center; gap: 12px; }
+
+  .spinner {
+    width: 24px; height: 24px;
+    border: 2px solid var(--border); border-top-color: var(--cyan);
+    border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-text {
+    font-family: 'Share Tech Mono', monospace; font-size: 13px;
+    color: var(--cyan); letter-spacing: 1px;
+  }
+
+  .vin-display {
+    font-family: 'Share Tech Mono', monospace; font-size: 13px;
+    color: var(--muted); letter-spacing: 2px; margin-bottom: 16px; word-break: break-all;
+  }
+
+  .vin-display span { color: var(--accent); }
+
+  .vehicle-header { margin-bottom: 16px; }
+
+  .vehicle-year {
+    font-family: 'Share Tech Mono', monospace; font-size: 13px;
+    color: var(--cyan); letter-spacing: 3px; margin-bottom: 4px;
+  }
+
+  .vehicle-name {
+    font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 28px;
+    color: #fff; line-height: 1; text-transform: uppercase; letter-spacing: 2px;
+  }
+
+  .vehicle-trim { font-size: 14px; color: var(--accent); margin-top: 4px; letter-spacing: 1px; }
+
+  .specs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .spec-item {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px;
+  }
+
+  .spec-item.full { grid-column: 1 / -1; }
+
+  .spec-label {
+    font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px;
+  }
+
+  .spec-value {
+    font-family: 'Rajdhani', sans-serif; font-weight: 600;
+    font-size: 15px; color: var(--text); line-height: 1.2;
+  }
+
+  .error-content { display: flex; align-items: flex-start; gap: 12px; }
+  .error-icon { font-size: 20px; flex-shrink: 0; }
+  .error-text { font-size: 14px; color: var(--error); line-height: 1.5; }
+
+  .scanned-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(34,197,94,0.1); border: 1px solid var(--success);
+    border-radius: 20px; padding: 4px 12px;
+    font-family: 'Share Tech Mono', monospace; font-size: 11px;
+    color: var(--success); letter-spacing: 1px; margin-top: 10px;
+  }
+
+  .pulse-dot {
+    width: 6px; height: 6px; background: var(--success); border-radius: 50%;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50% { opacity:.5; transform:scale(0.7); }
+  }
+
+  /* eBay */
+  .ebay-section { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+  .ebay-label {
+    font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    color: var(--muted); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 10px;
+  }
+
+  .ebay-buttons { display: flex; gap: 8px; }
+
+  .btn-ebay {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 11px 8px; background: var(--surface2);
+    border: 1px solid var(--accent); border-radius: 10px;
+    color: var(--accent); font-family: 'Rajdhani', sans-serif;
+    font-weight: 700; font-size: 12px; letter-spacing: 1.5px; cursor: pointer; transition: all 0.2s;
+  }
+
+  .btn-ebay:hover, .btn-ebay:active { background: var(--glow); box-shadow: 0 0 12px var(--glow); }
+
+  .ebay-note {
+    margin-top: 8px; font-family: 'Share Tech Mono', monospace;
+    font-size: 9px; color: var(--muted); letter-spacing: 1px; text-align: center;
+  }
+
+  /* History */
+  .history-card {
+    margin: 0 16px 16px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; position: relative;
+  }
+
+  .history-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+  }
+
+  .history-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px 10px; border-bottom: 1px solid var(--border);
+  }
+
+  .history-title {
+    font-family: 'Share Tech Mono', monospace; font-size: 10px;
+    letter-spacing: 3px; color: var(--cyan); text-transform: uppercase;
+    display: flex; align-items: center; gap: 7px;
+  }
+
+  .btn-clear-history {
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    padding: 4px 10px; font-family: 'Share Tech Mono', monospace;
+    font-size: 9px; letter-spacing: 2px; color: var(--muted); cursor: pointer; transition: all 0.15s;
+  }
+
+  .btn-clear-history:hover { border-color: var(--error); color: var(--error); }
+
+  .history-item {
+    display: flex; align-items: center;
+    padding: 11px 16px; border-bottom: 1px solid var(--border);
+    cursor: pointer; transition: background 0.15s; gap: 12px;
+  }
+
+  .history-item:last-child { border-bottom: none; }
+  .history-item:hover { background: var(--surface2); }
+
+  .history-item-icon {
+    width: 34px; height: 34px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+  }
+
+  .history-item-info { flex: 1; min-width: 0; }
+
+  .history-item-vehicle {
+    font-family: 'Rajdhani', sans-serif; font-weight: 700;
+    font-size: 15px; color: #fff; letter-spacing: 1px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .history-item-vin {
+    font-family: 'Share Tech Mono', monospace; font-size: 10px;
+    color: var(--muted); letter-spacing: 1px; margin-top: 2px;
+  }
+
+  .history-item-time {
+    font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    color: var(--muted); letter-spacing: 1px; white-space: nowrap; flex-shrink: 0;
+  }
+
+  .history-item-delete {
+    background: none; border: none; color: var(--muted);
+    cursor: pointer; padding: 4px; border-radius: 4px;
+    transition: color 0.15s; flex-shrink: 0; font-size: 14px; line-height: 1;
+  }
+
+  .history-item-delete:hover { color: var(--error); }
+
+  .history-empty {
+    padding: 20px 16px; text-align: center;
+    font-family: 'Share Tech Mono', monospace; font-size: 11px;
+    color: var(--muted); letter-spacing: 2px;
+  }
+
+  /* Sample VINs */
+  .samples {
+    margin: 0 16px 16px; padding: 14px 16px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  }
+
+  .samples-title {
+    font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    color: var(--muted); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 10px;
+  }
+
+  .sample-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .sample-chip {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 10px; font-family: 'Share Tech Mono', monospace;
+    font-size: 11px; color: var(--muted); cursor: pointer; transition: all 0.15s; letter-spacing: 1px;
+  }
+
+  .sample-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .sample-chip .chip-label { font-size: 9px; color: var(--muted); display: block; margin-bottom: 2px; letter-spacing: 1px; }
+
+  footer {
+    text-align: center; padding: 20px;
+    font-family: 'Share Tech Mono', monospace; font-size: 10px;
+    color: var(--muted); letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo-icon">🔍</div>
+    <div class="logo-text">
+      <div class="logo-title">RADIOB VIN SCAN</div>
+      <div class="logo-sub">VEHICLE IDENTIFICATION DECODER</div>
+    </div>
+  </header>
+
+  <div class="card" style="margin-top:20px">
+    <div class="scanner-section">
+      <div class="section-label">CAMERA SCANNER</div>
+      <div class="scanner-viewport">
+        <video id="preview" playsinline></video>
+        <div class="camera-placeholder" id="placeholder">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+          <span>Tap ACTIVATE SCANNER to use your camera and scan a VIN barcode</span>
+        </div>
+        <div class="scan-overlay" id="scanOverlay" style="display:none">
+          <div class="scan-frame">
+            <div class="corner-br"></div><div class="corner-bl"></div>
+            <div class="scan-line"></div>
+          </div>
+        </div>
+        <div class="scanner-hint" id="scannerHint" style="display:none">ALIGN VIN BARCODE WITHIN FRAME</div>
+      </div>
+      <button class="btn-scan" id="scanBtn" onclick="toggleScanner()">⚡ ACTIVATE SCANNER</button>
+    </div>
+
+    <div class="divider">OR ENTER MANUALLY</div>
+
+    <div class="manual-section">
+      <div class="section-label">MANUAL VIN ENTRY</div>
+      <div class="input-wrap">
+        <input class="vin-input" id="vinInput" type="text" maxlength="17"
+          placeholder="Enter 17-char VIN..."
+          oninput="this.value=this.value.toUpperCase()"
+          onkeydown="if(event.key==='Enter')decodeVIN()">
+        <button class="btn-decode" id="decodeBtn" onclick="decodeVIN()">DECODE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Result -->
+  <div class="status-card" id="statusCard"></div>
+
+  <!-- History -->
+  <div class="history-card" id="historyCard" style="display:none">
+    <div class="history-header">
+      <div class="history-title">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+        RECENT VINs
+      </div>
+      <button class="btn-clear-history" onclick="clearHistory()">CLEAR ALL</button>
+    </div>
+    <div id="historyList"></div>
+  </div>
+
+  <!-- Samples -->
+  <div class="samples">
+    <div class="samples-title">SAMPLE VINs FOR TESTING</div>
+    <div class="sample-chips">
+      <div class="sample-chip" onclick="useSample('1HGBH41JXMN109186')"><span class="chip-label">2021 HONDA</span>1HGBH41JXMN109186</div>
+      <div class="sample-chip" onclick="useSample('1FTFW1ET5DFC10312')"><span class="chip-label">2013 FORD F-150</span>1FTFW1ET5DFC10312</div>
+      <div class="sample-chip" onclick="useSample('2T1BURHE0JC043821')"><span class="chip-label">2018 TOYOTA</span>2T1BURHE0JC043821</div>
+      <div class="sample-chip" onclick="useSample('1C4RJFAG0FC198166')"><span class="chip-label">2015 JEEP</span>1C4RJFAG0FC198166</div>
+    </div>
+  </div>
+
+  <footer>POWERED BY NHTSA VPIC API · DATA FOR INFORMATIONAL USE</footer>
+</div>
+
+<script>
+let codeReader = null;
+let scanning = false;
+
+// ── HISTORY ──────────────────────────────────────────────
+const HISTORY_KEY = 'radiob_vin_history';
+const MAX_HISTORY = 20;
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
+  catch(e) { return []; }
+}
+
+function saveHistory(h) { localStorage.setItem(HISTORY_KEY, JSON.stringify(h)); }
+
+function addToHistory(vin, label) {
+  let h = loadHistory().filter(x => x.vin !== vin);
+  h.unshift({ vin, label, ts: Date.now() });
+  if (h.length > MAX_HISTORY) h = h.slice(0, MAX_HISTORY);
+  saveHistory(h);
+  renderHistory();
+}
+
+function deleteHistoryItem(vin) {
+  saveHistory(loadHistory().filter(x => x.vin !== vin));
+  renderHistory();
+}
+
+function clearHistory() { saveHistory([]); renderHistory(); }
+
+function timeAgo(ts) {
+  const d = Math.floor((Date.now() - ts) / 1000);
+  if (d < 60) return 'just now';
+  if (d < 3600) return Math.floor(d/60) + 'm ago';
+  if (d < 86400) return Math.floor(d/3600) + 'h ago';
+  return Math.floor(d/86400) + 'd ago';
+}
+
+function renderHistory() {
+  const h = loadHistory();
+  const card = document.getElementById('historyCard');
+  const list = document.getElementById('historyList');
+
+  if (!h.length) { card.style.display = 'none'; return; }
+
+  card.style.display = 'block';
+  list.innerHTML = h.map(function(item) {
+    return '<div class="history-item" onclick="loadFromHistory(\'' + item.vin + '\')">' +
+      '<div class="history-item-icon">🚗</div>' +
+      '<div class="history-item-info">' +
+        '<div class="history-item-vehicle">' + item.label + '</div>' +
+        '<div class="history-item-vin">' + item.vin + '</div>' +
+      '</div>' +
+      '<div class="history-item-time">' + timeAgo(item.ts) + '</div>' +
+      '<button class="history-item-delete" onclick="event.stopPropagation();deleteHistoryItem(\'' + item.vin + '\')" title="Remove">✕</button>' +
+    '</div>';
+  }).join('');
+}
+
+function loadFromHistory(vin) {
+  document.getElementById('vinInput').value = vin;
+  decodeVIN(vin);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── SCANNER ───────────────────────────────────────────────
+async function toggleScanner() {
+  const btn = document.getElementById('scanBtn');
+  if (scanning) { stopScanner(); return; }
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showStatus('error', 'Camera not supported on this browser. Please use manual entry.');
+    return;
+  }
+
+  try {
+    btn.textContent = '⏳ STARTING CAMERA...';
+    btn.disabled = true;
+
+    codeReader = new ZXing.BrowserBarcodeReader();
+    const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
+    const deviceId = devices.length > 0 ? devices[devices.length - 1].deviceId : undefined;
+
+    await codeReader.decodeFromVideoDevice(deviceId, 'preview', function(result) {
+      if (result) {
+        const vin = result.getText().replace(/[^A-Z0-9]/gi,'').toUpperCase();
+        if (vin.length === 17) { stopScanner(); document.getElementById('vinInput').value = vin; decodeVIN(vin); }
+      }
+    });
+
+    scanning = true;
+    document.getElementById('placeholder').style.display = 'none';
+    document.getElementById('scanOverlay').style.display = 'flex';
+    document.getElementById('scannerHint').style.display = 'block';
+    btn.textContent = '⛔ STOP SCANNER';
+    btn.classList.add('scanning');
+    btn.disabled = false;
+
+  } catch(e) {
+    btn.textContent = '⚡ ACTIVATE SCANNER';
+    btn.disabled = false;
+    showStatus('error', 'Camera access denied or unavailable. Please allow camera permission and try again.');
+  }
+}
+
+function stopScanner() {
+  if (codeReader) { codeReader.reset(); codeReader = null; }
+  scanning = false;
+  const btn = document.getElementById('scanBtn');
+  btn.textContent = '⚡ ACTIVATE SCANNER';
+  btn.classList.remove('scanning');
+  document.getElementById('scanOverlay').style.display = 'none';
+  document.getElementById('scannerHint').style.display = 'none';
+  document.getElementById('placeholder').style.display = 'flex';
+  document.getElementById('preview').srcObject = null;
+}
+
+function useSample(vin) { document.getElementById('vinInput').value = vin; decodeVIN(vin); }
+
+// ── DECODE ────────────────────────────────────────────────
+async function decodeVIN(vin) {
+  const input = document.getElementById('vinInput');
+  const v = (typeof vin === 'string' ? vin : input.value).trim().toUpperCase();
+
+  if (v.length !== 17) { showStatus('error', 'VIN must be exactly 17 characters. You entered ' + v.length + '.'); return; }
+  if (/[IOQ]/.test(v)) { showStatus('error', 'Invalid VIN: VINs cannot contain the letters I, O, or Q.'); return; }
+
+  showStatus('loading');
+  document.getElementById('decodeBtn').disabled = true;
+
+  try {
+    const resp = await fetch('https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValuesExtended/' + v + '?format=json');
+    if (!resp.ok) throw new Error();
+    const data = await resp.json();
+    const r = data.Results[0];
+    if (!r || !r.Make || r.Make === '') { showStatus('error', 'No vehicle found for this VIN. Please verify and try again.'); return; }
+    showVehicleResult(v, r);
+  } catch(e) {
+    showStatus('error', 'Failed to decode VIN. Check your internet connection and try again.');
+  } finally {
+    document.getElementById('decodeBtn').disabled = false;
+  }
+}
+
+function showStatus(type, msg) {
+  const card = document.getElementById('statusCard');
+  card.className = 'status-card visible ' + type;
+  if (type === 'loading') {
+    card.innerHTML = '<div class="loading-content"><div class="spinner"></div><div class="loading-text">[ DECODING VIN... ]</div></div>';
+  } else if (type === 'error') {
+    card.innerHTML = '<div class="error-content"><div class="error-icon">⚠</div><div class="error-text">' + msg + '</div></div>';
+  }
+}
+
+function v(r, key) {
+  const val = r[key];
+  return (val && val !== 'Not Applicable' && val !== '0' && val !== '') ? val : null;
+}
+
+function showVehicleResult(vin, r) {
+  const card = document.getElementById('statusCard');
+  card.className = 'status-card visible success';
+
+  const make  = v(r,'Make')  || 'Unknown';
+  const model = v(r,'Model') || 'Unknown';
+  const year  = v(r,'ModelYear') || '—';
+  const trim  = v(r,'Trim') || v(r,'Series') || null;
+
+  const specs = [
+    { label:'BODY STYLE',     val: v(r,'BodyClass') },
+    { label:'DRIVE TYPE',     val: v(r,'DriveType') },
+    { label:'FUEL TYPE',      val: v(r,'FuelTypePrimary') },
+    { label:'ENGINE',         val: buildEngine(r), full:true },
+    { label:'TRANSMISSION',   val: v(r,'TransmissionStyle') },
+    { label:'DOORS',          val: v(r,'Doors') ? v(r,'Doors')+' doors' : null },
+    { label:'SEATING',        val: v(r,'Seats') ? v(r,'Seats')+' seats' : null },
+    { label:'VEHICLE TYPE',   val: v(r,'VehicleType') },
+    { label:'MANUFACTURER',   val: v(r,'ManufacturerName'), full:true },
+    { label:'PLANT',          val: buildPlant(r), full:true },
+    { label:'GVWR',           val: v(r,'GVWR') },
+    { label:'ELECTRIFICATION',val: v(r,'ElectrificationLevel') },
+  ].filter(s => s.val);
+
+  const specHTML = specs.map(function(s) {
+    return '<div class="spec-item' + (s.full?' full':'') + '"><div class="spec-label">' + s.label + '</div><div class="spec-value">' + s.val + '</div></div>';
+  }).join('');
+
+  const trimHTML = trim ? '<div class="vehicle-trim">' + trim + '</div>' : '';
+  const label = year + ' ' + make + ' ' + model;
+  addToHistory(vin, label);
+
+  const ey = year.replace(/'/g,"\\'"), em = make.replace(/'/g,"\\'"), emd = model.replace(/'/g,"\\'");
+
+  card.innerHTML =
+    '<div class="scanned-chip"><div class="pulse-dot"></div>VIN DECODED</div>' +
+    '<div class="vin-display" style="margin-top:14px">VIN: <span>' + vin + '</span></div>' +
+    '<div class="vehicle-header">' +
+      '<div class="vehicle-year">' + year + '</div>' +
+      '<div class="vehicle-name">' + make + ' ' + model + '</div>' +
+      trimHTML +
+    '</div>' +
+    '<div class="specs-grid">' + specHTML + '</div>' +
+    '<div class="ebay-section">' +
+      '<div class="ebay-label">SEARCH EBAY USED OEM PARTS</div>' +
+      '<div class="ebay-buttons">' +
+        '<button class="btn-ebay" onclick="openEbay(\'' + ey + '\',\'' + em + '\',\'' + emd + '\',15)">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>LOW &rarr; HIGH</button>' +
+        '<button class="btn-ebay" onclick="openEbay(\'' + ey + '\',\'' + em + '\',\'' + emd + '\',16)">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>HIGH &rarr; LOW</button>' +
+      '</div>' +
+      '<div class="ebay-note">Used OEM parts only &mdash; sold listings &mdash; eBay Motors</div>' +
+    '</div>' +
+    '<div style="margin-top:14px;font-family:\'Share Tech Mono\',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;text-align:center;">SOURCE: NHTSA VPIC DATABASE</div>';
+}
+
+function openEbay(year, make, model, sort) {
+  // _sacat=6030  = eBay Motors Parts & Accessories
+  // LH_Sold=1 & LH_Complete=1 = sold/completed listings only
+  // LH_ItemCondition=4 = Used condition only
+  // "OEM" keyword filters out aftermarket parts
+  const q = encodeURIComponent([year, make, model, 'OEM'].join(' '));
+  const url = 'https://www.ebay.com/sch/i.html?_nkw=' + q
+    + '&_sacat=6030'
+    + '&LH_Sold=1'
+    + '&LH_Complete=1'
+    + '&LH_ItemCondition=4'
+    + '&_sop=' + sort;
+  window.open(url, '_blank');
+}
+
+function buildEngine(r) {
+  const disp = v(r,'DisplacementL'), cyl = v(r,'EngineCylinders');
+  const hp = v(r,'EngineHP'), config = v(r,'EngineConfiguration'), turbo = v(r,'Turbo');
+  let parts = [];
+  if (disp) parts.push(parseFloat(disp).toFixed(1)+'L');
+  if (config && cyl) parts.push(config+'-'+cyl);
+  else if (cyl) parts.push(cyl+'-cyl');
+  if (turbo && turbo.toLowerCase().includes('yes')) parts.push('Turbocharged');
+  if (hp) parts.push(hp+' HP');
+  return parts.length ? parts.join(' · ') : null;
+}
+
+function buildPlant(r) {
+  const parts = [v(r,'PlantCity'), v(r,'PlantState'), v(r,'PlantCountry')].filter(Boolean);
+  return parts.length ? parts.join(', ') : null;
+}
+
+// Init
+renderHistory();
+</script>
+</body>
+</html>
