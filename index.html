@@ -460,7 +460,10 @@
 
     <div class="scanner-layout">
       <div class="scanner-viewport">
-        <video id="preview" playsinline></video>
+        <!-- Quagga uses this viewport div for barcode scanning -->
+        <div id="quaggaViewport" style="width:100%;height:100%;position:absolute;top:0;left:0;"></div>
+        <!-- Dedicated video for OCR mode — untouched by Quagga -->
+        <video id="ocrPreview" playsinline style="width:100%;height:100%;object-fit:cover;display:none;position:absolute;top:0;left:0;"></video>
         <canvas id="captureCanvas"></canvas>
         <div class="camera-placeholder" id="placeholder">
           <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -547,7 +550,7 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.4.0</footer>
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.4.1</footer>
 </div>
 
 <script>
@@ -644,8 +647,9 @@ function setMode(mode) {
 
 function stopOcrCamera() {
   if (ocrStream) { ocrStream.getTracks().forEach(t => t.stop()); ocrStream = null; }
-  const preview = document.getElementById('preview');
-  if (preview.srcObject) { preview.srcObject = null; }
+  const ocrPreview = document.getElementById('ocrPreview');
+  ocrPreview.srcObject = null;
+  ocrPreview.style.display = 'none';
   document.getElementById('placeholder').style.display = 'flex';
   document.getElementById('scanOverlay').style.display = 'none';
   document.getElementById('scannerHint').style.display = 'none';
@@ -673,9 +677,10 @@ async function captureAndRead() {
       ocrStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
       });
-      const preview = document.getElementById('preview');
-      preview.srcObject = ocrStream;
-      await preview.play();
+      const ocrPreview = document.getElementById('ocrPreview');
+      ocrPreview.srcObject = ocrStream;
+      ocrPreview.style.display = 'block';
+      await ocrPreview.play();
       document.getElementById('placeholder').style.display = 'none';
       document.getElementById('scanOverlay').style.display = 'flex';
       document.getElementById('scannerHint').style.display = 'block';
@@ -701,11 +706,11 @@ async function captureAndRead() {
   ocrStatus.textContent = 'Capturing frame...';
 
   try {
-    const preview = document.getElementById('preview');
+    const ocrPreview = document.getElementById('ocrPreview');
     const canvas = document.getElementById('captureCanvas');
-    canvas.width = preview.videoWidth;
-    canvas.height = preview.videoHeight;
-    canvas.getContext('2d').drawImage(preview, 0, 0);
+    canvas.width = ocrPreview.videoWidth;
+    canvas.height = ocrPreview.videoHeight;
+    canvas.getContext('2d').drawImage(ocrPreview, 0, 0);
 
     ocrBar.style.width = '15%';
     ocrStatus.textContent = 'Loading OCR engine...';
@@ -789,7 +794,7 @@ async function toggleScanner() {
     inputStream: {
       name: 'Live',
       type: 'LiveStream',
-      target: document.getElementById('preview').parentElement,
+      target: document.getElementById('quaggaViewport'),
       constraints: {
         facingMode: 'environment',
         width: { ideal: 1280 },
@@ -847,12 +852,9 @@ function stopScanner() {
   document.getElementById('scanOverlay').style.display = 'none';
   document.getElementById('scannerHint').style.display = 'none';
   document.getElementById('placeholder').style.display = 'flex';
-  // Quagga injects its own video — clean it up
-  const viewport = document.querySelector('.scanner-viewport');
-  const quaggaVideo = viewport ? viewport.querySelector('video') : null;
-  if (quaggaVideo) quaggaVideo.remove();
-  const quaggaCanvas = viewport ? viewport.querySelector('canvas.drawingBuffer') : null;
-  if (quaggaCanvas) quaggaCanvas.remove();
+  // Clean up Quagga injected elements
+  const viewport = document.getElementById('quaggaViewport');
+  if (viewport) viewport.innerHTML = '';
 }
 
 function useSample(vin) { document.getElementById('vinInput').value = vin; decodeVIN(vin); }
