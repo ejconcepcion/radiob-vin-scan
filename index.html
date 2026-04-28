@@ -119,6 +119,11 @@
 
   #preview { width: 100%; height: 100%; object-fit: cover; display: block; }
 
+  /* Rotation correction for portrait device in landscape stream */
+  #preview.rotate-90  { transform: rotate(90deg)  scale(1.35); transform-origin: center; }
+  #preview.rotate-180 { transform: rotate(180deg) scale(1); transform-origin: center; }
+  #preview.rotate-270 { transform: rotate(270deg) scale(1.35); transform-origin: center; }
+
   .scan-overlay {
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
@@ -532,7 +537,7 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.3.2</footer>
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.3.3</footer>
 </div>
 
 <script>
@@ -667,6 +672,7 @@ async function captureAndRead() {
       document.getElementById('scannerHint').style.display = 'block';
       captureBtn.textContent = 'Capture & Read VIN';
       captureBtn.disabled = false;
+      fixVideoOrientation();
     } catch(e) {
       captureBtn.textContent = 'Capture & Read VIN';
       captureBtn.disabled = false;
@@ -797,6 +803,7 @@ async function toggleScanner() {
     btn.textContent = 'Stop Scanner';
     btn.classList.add('scanning');
     btn.disabled = false;
+    fixVideoOrientation();
 
   } catch(e) {
     btn.textContent = 'Activate Scanner';
@@ -937,6 +944,36 @@ function buildEngine(r) {
 function buildPlant(r) {
   const parts = [gv(r,'PlantCity'), gv(r,'PlantState'), gv(r,'PlantCountry')].filter(Boolean);
   return parts.length ? parts.join(', ') : null;
+}
+
+// ── ORIENTATION CORRECTION ───────────────────────────────
+function fixVideoOrientation() {
+  const preview = document.getElementById('preview');
+  if (!preview.srcObject) return;
+
+  preview.classList.remove('rotate-90', 'rotate-180', 'rotate-270');
+
+  let angle = 0;
+  if (window.screen && window.screen.orientation && window.screen.orientation.angle !== undefined) {
+    angle = window.screen.orientation.angle;
+  } else if (typeof window.orientation !== 'undefined') {
+    angle = window.orientation;
+    if (angle < 0) angle += 360;
+  }
+
+  if (angle === 90)  preview.classList.add('rotate-270');
+  if (angle === 270) preview.classList.add('rotate-90');
+  if (angle === 180) preview.classList.add('rotate-180');
+}
+
+window.addEventListener('orientationchange', function() {
+  setTimeout(fixVideoOrientation, 300);
+});
+
+if (window.screen && window.screen.orientation) {
+  window.screen.orientation.addEventListener('change', function() {
+    setTimeout(fixVideoOrientation, 300);
+  });
 }
 
 renderHistory();
