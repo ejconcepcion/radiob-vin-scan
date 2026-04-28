@@ -398,6 +398,9 @@
         </div>
       </div>
     </div>
+
+    <!-- Debug output -->
+    <div id="ocrDebug" style="display:none;margin-top:10px;padding:10px;background:#f9f9f9;border:1px solid #ddd;border-radius:6px;font-size:11px;font-family:'Courier New',monospace;color:#333;white-space:pre-wrap;word-break:break-all;max-height:150px;overflow-y:auto;"></div>
   </div>
 
   <div class="divider">or enter manually</div>
@@ -450,7 +453,7 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.6.4</footer>
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.6.5</footer>
 </div>
 
 <script>
@@ -575,6 +578,8 @@ function retakePhoto() {
   document.getElementById('placeholder').style.display = 'flex';
   document.getElementById('retakeBtn').style.display = 'none';
   document.getElementById('ocrProgress').classList.remove('visible');
+  var debugBox = document.getElementById('ocrDebug');
+  if (debugBox) { debugBox.style.display = 'none'; debugBox.textContent = ''; }
 }
 
 // ── BARCODE PHOTO MODE ────────────────────────────────────
