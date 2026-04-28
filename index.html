@@ -550,7 +550,7 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.4.1</footer>
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.4.3</footer>
 </div>
 
 <script>
@@ -675,8 +675,22 @@ async function captureAndRead() {
       captureBtn.textContent = 'Starting camera...';
       captureBtn.disabled = true;
       ocrStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+        video: {
+          facingMode: { exact: 'environment' },
+          width: { min: 640, ideal: 1280, max: 1920 },
+          height: { min: 480, ideal: 720, max: 1080 },
+          advanced: [{ zoom: 1.0 }]
+        }
       });
+
+      // Reset zoom to 1x via applyConstraints if supported
+      const track = ocrStream.getVideoTracks()[0];
+      if (track && track.getCapabilities && track.applyConstraints) {
+        const caps = track.getCapabilities();
+        if (caps.zoom) {
+          try { await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min }] }); } catch(e) {}
+        }
+      }
       const ocrPreview = document.getElementById('ocrPreview');
       ocrPreview.srcObject = ocrStream;
       ocrPreview.style.display = 'block';
@@ -796,9 +810,12 @@ async function toggleScanner() {
       type: 'LiveStream',
       target: document.getElementById('quaggaViewport'),
       constraints: {
-        facingMode: 'environment',
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
+        facingMode: { exact: 'environment' },
+        width: { min: 640, ideal: 1280, max: 1920 },
+        height: { min: 480, ideal: 720, max: 1080 },
+        zoom: 1.0,
+        focusMode: 'continuous',
+        advanced: [{ zoom: 1.0 }]
       },
     },
     decoder: {
@@ -820,6 +837,17 @@ async function toggleScanner() {
 
     Quagga.start();
     scanning = true;
+
+    // Reset zoom to 1x if the camera supports it
+    const track = Quagga.CameraAccess.getActiveTrack
+      ? Quagga.CameraAccess.getActiveTrack()
+      : null;
+    if (track && track.getCapabilities && track.applyConstraints) {
+      const caps = track.getCapabilities();
+      if (caps.zoom) {
+        track.applyConstraints({ advanced: [{ zoom: caps.zoom.min }] }).catch(function() {});
+      }
+    }
 
     // Hide placeholder, show overlay
     document.getElementById('placeholder').style.display = 'none';
