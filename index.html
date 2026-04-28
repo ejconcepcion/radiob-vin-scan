@@ -10,8 +10,8 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>RadioB VIN Scan</title>
-<script src="https://unpkg.com/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
-<script src="https://unpkg.com/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
+<script src="https://unpkg.com/tesseract.js@4.1.4/dist/tesseract.min.js"></script>
 <style>
   :root {
     --bg: #f5f5f5;
@@ -40,55 +40,19 @@
   /* Landscape layout */
   @media (orientation: landscape) and (max-height: 500px) {
     .app { max-width: 100%; }
-
     header { padding: 10px 16px; }
-
     .logo-sub { display: none; }
-
     .section { padding: 10px 16px; }
-
-    .section-title { margin-bottom: 6px; }
-
-    /* Side-by-side layout: camera left, controls right */
-    .scanner-layout {
-      display: flex;
-      gap: 12px;
-      align-items: flex-start;
-    }
-
-    .scanner-layout .scanner-viewport {
-      flex: 1;
-      aspect-ratio: 4/3;
-      min-width: 0;
-    }
-
-    .scanner-controls {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      width: 180px;
-      flex-shrink: 0;
-    }
-
+    .scanner-layout { display: flex; gap: 12px; align-items: flex-start; }
+    .scanner-layout .photo-viewport { flex: 1; min-width: 0; }
+    .scanner-controls { display: flex; flex-direction: column; gap: 8px; width: 180px; flex-shrink: 0; }
     .mode-toggle { flex-direction: column; margin-bottom: 0; }
-
     .btn-primary, .btn-capture { margin-top: 0; }
-
-    .ocr-progress { margin-top: 6px; }
-
-    /* Compact manual entry */
-    .manual-section { padding: 8px 16px 12px; }
-
-    /* Hide samples in landscape to save space */
     .samples { display: none; }
-
     footer { padding: 8px; }
   }
 
-  /* General responsive tweaks for wider screens */
-  @media (min-width: 600px) {
-    .app { max-width: 560px; }
-  }
+  @media (min-width: 600px) { .app { max-width: 560px; } }
 
   /* Header */
   header {
@@ -98,12 +62,10 @@
   }
 
   .logo-icon { font-size: 22px; }
-
   .logo-title { font-size: 17px; font-weight: 700; color: #000; }
-
   .logo-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
 
-  /* Sections */
+  /* Section */
   .section { padding: 16px; border-bottom: 1px solid var(--border); }
 
   .section-title {
@@ -111,71 +73,41 @@
     text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;
   }
 
-  /* Scanner */
-  .scanner-viewport {
-    position: relative; background: #000; border-radius: 8px;
-    overflow: hidden; aspect-ratio: 4/3; border: 1px solid var(--border);
-  }
-
-  #preview { width: 100%; height: 100%; object-fit: cover; display: block; }
-
-  .scan-overlay {
-    position: absolute; inset: 0;
+  /* Photo viewport */
+  .photo-viewport {
+    position: relative;
+    background: var(--surface2);
+    border-radius: 8px;
+    overflow: hidden;
+    aspect-ratio: 4/3;
+    border: 1px solid var(--border);
     display: flex; align-items: center; justify-content: center;
-    pointer-events: none;
   }
 
-  .scan-frame { position: relative; width: 75%; height: 28%; transition: all 0.3s ease; }
-
-  /* In landscape, VIN barcodes are vertical so rotate the frame 90 degrees */
-  .scan-frame.rotated { width: 28%; height: 75%; }
-
-  .scan-frame.rotated .scan-line {
-    top: 0; bottom: 0; left: 50%;
-    right: auto; width: 1px; height: 100%;
-    background: var(--accent);
-    animation: scanMoveH 2s ease-in-out infinite;
-  }
-
-  @keyframes scanMoveH {
-    0%,100% { transform: translateX(-16px); opacity:.4; }
-    50% { transform: translateX(16px); opacity:1; }
-  }
-
-  .scan-frame::before, .scan-frame::after, .corner-br, .corner-bl {
-    content: ''; position: absolute; width: 20px; height: 20px;
-    border-color: var(--accent); border-style: solid;
-  }
-
-  .scan-frame::before { top:0; left:0; border-width:2px 0 0 2px; }
-  .scan-frame::after  { top:0; right:0; border-width:2px 2px 0 0; }
-  .corner-br { bottom:0; right:0; border-width:0 2px 2px 0; }
-  .corner-bl { bottom:0; left:0; border-width:0 0 2px 2px; }
-
-  .scan-line {
-    position: absolute; left: 0; right: 0; height: 1px; top: 50%;
-    background: var(--accent); opacity: 0.8;
-    animation: scanMove 2s ease-in-out infinite;
-  }
-
-  @keyframes scanMove {
-    0%,100% { transform: translateY(-16px); opacity:.4; }
-    50% { transform: translateY(16px); opacity:1; }
-  }
-
-  .scanner-hint {
-    position: absolute; bottom: 10px; left: 0; right: 0;
-    text-align: center; font-size: 11px; color: rgba(255,255,255,0.4);
+  .photo-viewport img#photoPreview {
+    width: 100%; height: 100%; object-fit: contain;
+    display: none; position: absolute; top: 0; left: 0;
   }
 
   .camera-placeholder {
-    position: absolute; inset: 0;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 10px; color: var(--muted);
+    gap: 10px; color: var(--muted); padding: 20px; text-align: center;
   }
 
   .camera-placeholder svg { opacity: 0.3; }
-  .camera-placeholder span { font-size: 13px; text-align: center; padding: 0 24px; line-height: 1.5; }
+  .camera-placeholder span { font-size: 13px; line-height: 1.5; }
+
+  /* Mode toggle */
+  .mode-toggle { display: flex; flex-direction: row; gap: 6px; margin-bottom: 10px; }
+
+  .btn-mode {
+    flex: 1; padding: 8px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; font-size: 13px; font-weight: 500;
+    color: var(--muted); cursor: pointer; transition: all 0.15s;
+  }
+
+  .btn-mode.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
   /* Buttons */
   .btn-primary {
@@ -187,16 +119,43 @@
 
   .btn-primary:active { opacity: 0.8; }
   .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn-primary.scanning { background: transparent; color: var(--error); border: 1px solid var(--error); }
 
+  .btn-capture {
+    width: 100%; margin-top: 10px; padding: 13px;
+    background: #fff; border: 2px solid var(--accent); border-radius: 8px;
+    font-size: 15px; font-weight: 600; color: var(--accent); cursor: pointer;
+    transition: all 0.15s; display: none;
+  }
+
+  .btn-capture:active { background: #e8f0fd; }
+  .btn-capture:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-retake {
+    width: 100%; margin-top: 6px; padding: 9px;
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer;
+    display: none;
+  }
+
+  .btn-retake:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* OCR progress */
+  .ocr-progress { margin-top: 10px; display: none; }
+  .ocr-progress.visible { display: block; }
+  .ocr-bar-wrap { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .ocr-bar { height: 100%; background: var(--accent); border-radius: 2px; width: 0%; transition: width 0.2s; }
+  .ocr-status { font-size: 11px; color: var(--muted); margin-top: 5px; text-align: center; }
+
+  /* Divider */
   .divider {
     display: flex; align-items: center; gap: 10px;
     padding: 12px 16px; color: var(--muted); font-size: 12px;
   }
-
   .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
-  /* Input */
+  /* Manual input */
+  .manual-section { padding: 0 16px 16px; }
+
   .input-wrap { display: flex; gap: 8px; }
 
   .vin-input {
@@ -220,7 +179,7 @@
   .btn-decode:hover { background: #e8f0fd; }
   .btn-decode:disabled { opacity: 0.4; cursor: not-allowed; }
 
-  /* Status */
+  /* Status card */
   .status-card {
     margin: 12px 16px; padding: 14px;
     background: var(--surface); border: 1px solid var(--border);
@@ -249,7 +208,7 @@
   /* Result */
   .decoded-badge {
     display: inline-flex; align-items: center; gap: 6px;
-    background: rgba(76,175,80,0.1); border: 1px solid var(--success);
+    background: rgba(46,125,50,0.1); border: 1px solid var(--success);
     border-radius: 4px; padding: 3px 10px;
     font-size: 11px; color: var(--success); margin-bottom: 12px;
   }
@@ -265,9 +224,7 @@
   .vin-label span { color: var(--text); }
 
   .vehicle-year { font-size: 12px; color: var(--muted); margin-bottom: 2px; }
-
   .vehicle-name { font-size: 24px; font-weight: 700; color: var(--text); line-height: 1.1; margin-bottom: 4px; }
-
   .vehicle-trim { font-size: 13px; color: var(--accent); margin-bottom: 14px; }
 
   .specs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 16px; }
@@ -307,7 +264,6 @@
   .btn-ebay:hover { border-color: var(--accent); color: var(--accent); background: #e8f0fd; }
 
   .ebay-note { margin-top: 7px; font-size: 11px; color: var(--muted); text-align: center; }
-
   .source-note { margin-top: 12px; font-size: 11px; color: var(--muted); text-align: center; }
 
   /* History */
@@ -351,11 +307,7 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 
-  .history-vin {
-    font-size: 11px; color: var(--muted);
-    font-family: 'Courier New', monospace; margin-top: 1px;
-  }
-
+  .history-vin { font-size: 11px; color: var(--muted); font-family: 'Courier New', monospace; margin-top: 1px; }
   .history-time { font-size: 11px; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
 
   .btn-remove {
@@ -389,58 +341,6 @@
     margin-bottom: 2px; font-family: inherit; letter-spacing: 0;
   }
 
-  /* Mode toggle */
-  .mode-toggle {
-    display: flex; flex-direction: row; gap: 6px; margin-bottom: 12px;
-  }
-
-  .btn-mode {
-    flex: 1; padding: 8px;
-    background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 8px; font-size: 13px; font-weight: 500;
-    color: var(--muted); cursor: pointer; transition: all 0.15s;
-  }
-
-  .btn-mode.active {
-    background: var(--accent); border-color: var(--accent);
-    color: #fff;
-  }
-
-  /* OCR capture button */
-  .btn-capture {
-    width: 100%; margin-top: 10px; padding: 13px;
-    background: #fff; border: 2px solid var(--accent);
-    border-radius: 8px; font-size: 15px; font-weight: 600;
-    color: var(--accent); cursor: pointer; transition: all 0.15s;
-  }
-
-  .btn-capture:active { background: #e8f0fd; }
-  .btn-capture:disabled { opacity: 0.4; cursor: not-allowed; }
-
-  /* OCR progress */
-  .ocr-progress {
-    margin-top: 10px; display: none;
-  }
-
-  .ocr-progress.visible { display: block; }
-
-  .ocr-bar-wrap {
-    height: 4px; background: var(--border); border-radius: 2px; overflow: hidden;
-  }
-
-  .ocr-bar {
-    height: 100%; background: var(--accent);
-    border-radius: 2px; width: 0%;
-    transition: width 0.2s;
-  }
-
-  .ocr-status {
-    font-size: 11px; color: var(--muted); margin-top: 5px; text-align: center;
-  }
-
-  /* Hidden canvas for frame capture */
-  #captureCanvas { display: none; }
-
   footer { text-align: center; padding: 16px; font-size: 11px; color: var(--muted); }
 </style>
 </head>
@@ -455,65 +355,55 @@
     </div>
   </header>
 
+  <!-- Camera Capture Section -->
   <div class="section">
-    <div class="section-title">Camera Scanner</div>
+    <div class="section-title">Camera Capture</div>
 
     <div class="scanner-layout">
-      <div class="scanner-viewport">
-        <!-- Quagga uses this viewport div for barcode scanning -->
-        <div id="quaggaViewport" style="width:100%;height:100%;position:absolute;top:0;left:0;"></div>
-        <!-- Dedicated video for OCR mode — untouched by Quagga -->
-        <video id="ocrPreview" playsinline style="width:100%;height:100%;object-fit:cover;display:none;position:absolute;top:0;left:0;"></video>
-        <canvas id="captureCanvas"></canvas>
+      <!-- Photo preview viewport -->
+      <div class="photo-viewport" id="photoViewport">
         <div class="camera-placeholder" id="placeholder">
           <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
             <circle cx="12" cy="13" r="4"/>
           </svg>
-          <span id="placeholderText">Tap Activate Scanner to scan a VIN barcode</span>
+          <span id="placeholderText">Take a photo of the VIN barcode sticker</span>
         </div>
-        <div class="scan-overlay" id="scanOverlay" style="display:none">
-          <div class="scan-frame" id="scanFrame">
-            <div class="corner-br"></div>
-            <div class="corner-bl"></div>
-            <div class="scan-line"></div>
-          </div>
-        </div>
-        <div class="scanner-hint" id="scannerHint" style="display:none">Align VIN barcode within frame</div>
+        <img id="photoPreview" alt="Captured VIN photo">
       </div>
 
       <div class="scanner-controls">
         <!-- Mode toggle -->
         <div class="mode-toggle">
-          <button class="btn-mode active" id="modeBarcodeBtn" onclick="setMode('barcode')">📷 Scan Barcode</button>
-          <button class="btn-mode" id="modeOcrBtn" onclick="setMode('ocr')">🔤 Read VIN Text</button>
+          <button class="btn-mode active" id="modeBarcodeBtn" onclick="setMode('barcode')">📷 Barcode</button>
+          <button class="btn-mode" id="modeOcrBtn" onclick="setMode('ocr')">🔤 VIN Text</button>
         </div>
 
-        <!-- Barcode button -->
-        <button class="btn-primary" id="scanBtn" onclick="toggleScanner()">Activate Scanner</button>
+        <!-- Hidden file input — triggers native camera -->
+        <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none">
 
-        <!-- OCR button -->
-        <button class="btn-capture" id="captureBtn" onclick="captureAndRead()" style="display:none">Capture & Read VIN</button>
+        <!-- Barcode photo button -->
+        <button class="btn-primary" id="scanBtn" onclick="triggerPhoto('barcode')">📷 Take Photo of Barcode</button>
 
-        <!-- OCR progress -->
+        <!-- OCR text photo button -->
+        <button class="btn-capture" id="captureBtn" onclick="triggerPhoto('ocr')">📷 Take Photo of VIN Text</button>
+
+        <!-- Retake button -->
+        <button class="btn-retake" id="retakeBtn" onclick="retakePhoto()">↩ Retake Photo</button>
+
+        <!-- Progress bar -->
         <div class="ocr-progress" id="ocrProgress">
           <div class="ocr-bar-wrap"><div class="ocr-bar" id="ocrBar"></div></div>
-          <div class="ocr-status" id="ocrStatus">Initializing OCR...</div>
+          <div class="ocr-status" id="ocrStatus"></div>
         </div>
-
-        <!-- Camera selector -->
-        <div id="cameraSelectorWrap" style="margin-top:8px;display:none;">
-          <div style="font-size:11px;color:#888;margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Select Camera</div>
-          <select id="cameraSelect" style="width:100%;padding:7px 10px;font-size:12px;border:1px solid #ddd;border-radius:6px;background:#fff;color:#333;"></select>
-        </div>
-        <button id="listCamerasBtn" style="margin-top:8px;padding:6px 10px;font-size:11px;background:#fff;border:1px solid #ddd;border-radius:6px;color:#888;cursor:pointer;width:100%;">🔎 Choose Camera</button>
       </div>
     </div>
   </div>
 
   <div class="divider">or enter manually</div>
 
-  <div class="manual-section" style="padding: 0 16px 16px;">
+  <!-- Manual Entry -->
+  <div class="manual-section">
     <div class="section-title">Manual Entry</div>
     <div class="input-wrap">
       <input class="vin-input" id="vinInput" type="text" maxlength="17"
@@ -524,8 +414,10 @@
     </div>
   </div>
 
+  <!-- Result -->
   <div class="status-card" id="statusCard"></div>
 
+  <!-- History -->
   <div class="history-card" id="historyCard" style="display:none">
     <div class="history-header">
       <div class="history-title">
@@ -539,6 +431,7 @@
     <div id="historyList"></div>
   </div>
 
+  <!-- Samples -->
   <div class="samples">
     <div class="samples-title">Sample VINs for Testing</div>
     <div class="sample-chips">
@@ -557,12 +450,11 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.5.0</footer>
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.6.2</footer>
 </div>
 
 <script>
-let scanning = false;
-
+// ── HISTORY ──────────────────────────────────────────────
 const HISTORY_KEY = 'radiob_vin_history';
 const MAX_HISTORY = 20;
 
@@ -571,21 +463,30 @@ function loadHistory() {
   catch(e) { return []; }
 }
 
-function saveHistory(h) { localStorage.setItem(HISTORY_KEY, JSON.stringify(h)); }
+function saveHistory(h) {
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
+}
 
 function addToHistory(vin, label) {
-  let h = loadHistory().filter(x => x.vin !== vin);
-  h.unshift({ vin, label, ts: Date.now() });
+  let h = loadHistory().filter(function(x) { return x.vin !== vin; });
+  h.unshift({ vin: vin, label: label, ts: Date.now() });
   if (h.length > MAX_HISTORY) h = h.slice(0, MAX_HISTORY);
   saveHistory(h);
   renderHistory();
 }
 
-function deleteHistoryItem(vin) { saveHistory(loadHistory().filter(x => x.vin !== vin)); renderHistory(); }
-function clearHistory() { saveHistory([]); renderHistory(); }
+function deleteHistoryItem(vin) {
+  saveHistory(loadHistory().filter(function(x) { return x.vin !== vin; }));
+  renderHistory();
+}
+
+function clearHistory() {
+  saveHistory([]);
+  renderHistory();
+}
 
 function timeAgo(ts) {
-  const d = Math.floor((Date.now() - ts) / 1000);
+  var d = Math.floor((Date.now() - ts) / 1000);
   if (d < 60) return 'just now';
   if (d < 3600) return Math.floor(d/60) + 'm ago';
   if (d < 86400) return Math.floor(d/3600) + 'h ago';
@@ -593,9 +494,9 @@ function timeAgo(ts) {
 }
 
 function renderHistory() {
-  const h = loadHistory();
-  const card = document.getElementById('historyCard');
-  const list = document.getElementById('historyList');
+  var h = loadHistory();
+  var card = document.getElementById('historyCard');
+  var list = document.getElementById('historyList');
   if (!h.length) { card.style.display = 'none'; return; }
   card.style.display = 'block';
   list.innerHTML = h.map(function(item) {
@@ -617,335 +518,189 @@ function loadFromHistory(vin) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// ── MODE SWITCHING ───────────────────────────────────────
-let currentMode = 'barcode';
-let ocrStream = null;
+// ── MODE SWITCHING ────────────────────────────────────────
+var currentMode = 'barcode';
 
 function setMode(mode) {
   currentMode = mode;
-  stopScanner();
-  stopOcrCamera();
-
-  const barcodeBtn = document.getElementById('modeBarcodeBtn');
-  const ocrBtn = document.getElementById('modeOcrBtn');
-  const scanBtn = document.getElementById('scanBtn');
-  const captureBtn = document.getElementById('captureBtn');
-  const placeholder = document.getElementById('placeholderText');
-  const ocrProgress = document.getElementById('ocrProgress');
-
-  ocrProgress.classList.remove('visible');
+  retakePhoto();
+  var barcodeBtn = document.getElementById('modeBarcodeBtn');
+  var ocrBtn = document.getElementById('modeOcrBtn');
+  var scanBtn = document.getElementById('scanBtn');
+  var captureBtn = document.getElementById('captureBtn');
+  document.getElementById('ocrProgress').classList.remove('visible');
 
   if (mode === 'barcode') {
     barcodeBtn.classList.add('active');
     ocrBtn.classList.remove('active');
     scanBtn.style.display = 'block';
     captureBtn.style.display = 'none';
-    placeholder.textContent = 'Tap Activate Scanner to scan a VIN barcode';
-    document.getElementById('scannerHint').textContent = 'Align VIN barcode within frame';
+    document.getElementById('placeholderText').textContent = 'Take a photo of the VIN barcode sticker';
   } else {
     ocrBtn.classList.add('active');
     barcodeBtn.classList.remove('active');
     scanBtn.style.display = 'none';
     captureBtn.style.display = 'block';
-    placeholder.textContent = 'Tap Capture & Read VIN to read VIN text with your camera';
-    document.getElementById('scannerHint').textContent = 'Hold steady — point at VIN plate or door sticker';
+    document.getElementById('placeholderText').textContent = 'Take a photo of the VIN plate or door sticker text';
   }
 }
 
-function stopOcrCamera() {
-  if (ocrStream) { ocrStream.getTracks().forEach(t => t.stop()); ocrStream = null; }
-  const ocrPreview = document.getElementById('ocrPreview');
-  ocrPreview.srcObject = null;
-  ocrPreview.style.display = 'none';
-  document.getElementById('placeholder').style.display = 'flex';
-  document.getElementById('scanOverlay').style.display = 'none';
-  document.getElementById('scannerHint').style.display = 'none';
-  const captureBtn = document.getElementById('captureBtn');
-  captureBtn.disabled = false;
-  captureBtn.textContent = 'Capture & Read VIN';
-}
-
-async function captureAndRead() {
-  const captureBtn = document.getElementById('captureBtn');
-  const ocrProgress = document.getElementById('ocrProgress');
-  const ocrBar = document.getElementById('ocrBar');
-  const ocrStatus = document.getElementById('ocrStatus');
-
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    showStatus('error', 'Camera not available. Make sure you are on HTTPS.');
-    return;
-  }
-
-  // First tap: start camera so user can frame the shot
-  if (!ocrStream) {
-    try {
-      captureBtn.textContent = 'Starting camera...';
-      captureBtn.disabled = true;
-      // Use manually selected camera if set, otherwise auto-detect wide angle
-      let ocrDeviceId = selectedDeviceId;
-      if (!ocrDeviceId) {
-        try {
-          const devices = await navigator.mediaDevices.enumerateDevices();
-          const videoDevices = devices.filter(d => d.kind === 'videoinput');
-          const backCams = videoDevices.filter(d => /facing back/i.test(d.label));
-          const cam0 = backCams.find(d => /camera 0/i.test(d.label));
-          const cam2 = backCams.find(d => /camera 2/i.test(d.label));
-          const chosen = cam0 || cam2 || backCams[0];
-          ocrDeviceId = chosen ? chosen.deviceId : null;
-        } catch(e) {}
-      }
-
-      const ocrConstraints = ocrDeviceId
-        ? { deviceId: { exact: ocrDeviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
-        : { facingMode: { exact: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } };
-
-      ocrStream = await navigator.mediaDevices.getUserMedia({ video: ocrConstraints });
-      const ocrPreview = document.getElementById('ocrPreview');
-      ocrPreview.srcObject = ocrStream;
-      ocrPreview.style.display = 'block';
-      await ocrPreview.play();
-      document.getElementById('placeholder').style.display = 'none';
-      document.getElementById('scanOverlay').style.display = 'flex';
-      document.getElementById('scannerHint').style.display = 'block';
-      captureBtn.textContent = 'Capture & Read VIN';
-      captureBtn.disabled = false;
-    } catch(e) {
-      captureBtn.textContent = 'Capture & Read VIN';
-      captureBtn.disabled = false;
-      if (e.name === 'NotAllowedError') {
-        showStatus('error', 'Camera permission denied. Allow camera access in browser settings and refresh.');
-      } else {
-        showStatus('error', 'Could not start camera: ' + e.message);
-      }
+// ── PHOTO CAPTURE ─────────────────────────────────────────
+function triggerPhoto(mode) {
+  var input = document.getElementById('photoInput');
+  input.onchange = function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    e.target.value = '';
+    if (mode === 'barcode') {
+      handleBarcodePhoto(file);
+    } else {
+      handleOcrPhoto(file);
     }
-    return;
-  }
+  };
+  input.click();
+}
 
-  // Second tap: capture frame and run OCR
-  captureBtn.textContent = 'Reading...';
-  captureBtn.disabled = true;
-  ocrProgress.classList.add('visible');
-  ocrBar.style.width = '5%';
-  ocrStatus.textContent = 'Capturing frame...';
+function showPhotoPreview(dataUrl) {
+  var preview = document.getElementById('photoPreview');
+  preview.src = dataUrl;
+  preview.style.display = 'block';
+  document.getElementById('placeholder').style.display = 'none';
+  document.getElementById('retakeBtn').style.display = 'block';
+}
 
-  try {
-    const ocrPreview = document.getElementById('ocrPreview');
-    const canvas = document.getElementById('captureCanvas');
-    canvas.width = ocrPreview.videoWidth;
-    canvas.height = ocrPreview.videoHeight;
-    canvas.getContext('2d').drawImage(ocrPreview, 0, 0);
+function retakePhoto() {
+  document.getElementById('photoPreview').style.display = 'none';
+  document.getElementById('photoPreview').src = '';
+  document.getElementById('placeholder').style.display = 'flex';
+  document.getElementById('retakeBtn').style.display = 'none';
+  document.getElementById('ocrProgress').classList.remove('visible');
+}
 
-    ocrBar.style.width = '15%';
+// ── BARCODE PHOTO MODE ────────────────────────────────────
+function handleBarcodePhoto(file) {
+  var ocrProgress = document.getElementById('ocrProgress');
+  var ocrBar = document.getElementById('ocrBar');
+  var ocrStatus = document.getElementById('ocrStatus');
+
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    showPhotoPreview(ev.target.result);
+    ocrProgress.classList.add('visible');
+    ocrBar.style.width = '20%';
+    ocrStatus.textContent = 'Scanning for barcode...';
+
+    var img = new Image();
+    img.onload = function() {
+      var canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+
+      try {
+        var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        var zxingReader = new ZXing.MultiFormatReader();
+        var hints = new Map();
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+          ZXing.BarcodeFormat.CODE_39,
+          ZXing.BarcodeFormat.CODE_128
+        ]);
+        zxingReader.setHints(hints);
+        var luminanceSource = new ZXing.RGBLuminanceSource(imageData.data, canvas.width, canvas.height);
+        var binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
+        var result = zxingReader.decode(binaryBitmap);
+        var vin = result.getText().replace(/[^A-Z0-9]/gi, '').toUpperCase();
+
+        if (vin.length === 17 && !/[IOQ]/.test(vin)) {
+          ocrBar.style.width = '100%';
+          ocrStatus.textContent = '✓ Barcode found!';
+          document.getElementById('vinInput').value = vin;
+          setTimeout(function() { ocrProgress.classList.remove('visible'); }, 800);
+          decodeVIN(vin);
+        } else {
+          ocrStatus.textContent = 'No valid VIN barcode found. Try VIN Text mode instead.';
+          ocrBar.style.width = '0%';
+        }
+      } catch(e) {
+        ocrStatus.textContent = 'No barcode detected. Try VIN Text mode or manual entry.';
+        ocrBar.style.width = '0%';
+      }
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── OCR PHOTO MODE ────────────────────────────────────────
+function handleOcrPhoto(file) {
+  var ocrProgress = document.getElementById('ocrProgress');
+  var ocrBar = document.getElementById('ocrBar');
+  var ocrStatus = document.getElementById('ocrStatus');
+  var captureBtn = document.getElementById('captureBtn');
+
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    showPhotoPreview(ev.target.result);
+    captureBtn.disabled = true;
+    captureBtn.textContent = 'Reading...';
+    ocrProgress.classList.add('visible');
+    ocrBar.style.width = '10%';
     ocrStatus.textContent = 'Loading OCR engine...';
 
-    const { data: { text } } = await Tesseract.recognize(canvas, 'eng', {
+    Tesseract.createWorker('eng', Tesseract.OEM.LSTM_ONLY, {
       logger: function(m) {
         if (m.status === 'recognizing text') {
-          ocrBar.style.width = Math.round(15 + m.progress * 80) + '%';
+          ocrBar.style.width = Math.round(10 + m.progress * 85) + '%';
           ocrStatus.textContent = 'Reading text... ' + Math.round(m.progress * 100) + '%';
-        } else if (m.status === 'loading language traineddata') {
-          ocrStatus.textContent = 'Loading language data...';
-          ocrBar.style.width = '10%';
         }
       }
-    });
+    }).then(function(worker) {
+      return worker.recognize(ev.target.result).then(function(result) {
+        return worker.terminate().then(function() {
+          return result;
+        });
+      });
+    }).then(function(result) {
+      ocrBar.style.width = '100%';
+      ocrStatus.textContent = 'Scanning for VIN pattern...';
 
-    ocrBar.style.width = '100%';
-    ocrStatus.textContent = 'Scanning for VIN pattern...';
+      var text = result.data.text;
+      var cleaned = text.replace(/[^A-HJ-NPR-Z0-9]/gi, ' ').toUpperCase();
+      var match = cleaned.match(/\b[A-HJ-NPR-Z0-9]{17}\b/);
 
-    // Clean text and look for 17-char VIN pattern (no I, O, Q)
-    const cleaned = text.replace(/[^A-HJ-NPR-Z0-9]/gi, ' ').toUpperCase();
-    const match = cleaned.match(/\b[A-HJ-NPR-Z0-9]{17}\b/);
-
-    if (match) {
-      const vin = match[0];
-      stopOcrCamera();
+      if (match) {
+        var vin = match[0];
+        document.getElementById('vinInput').value = vin;
+        ocrStatus.textContent = '✓ VIN found: ' + vin;
+        setTimeout(function() { ocrProgress.classList.remove('visible'); }, 1000);
+        decodeVIN(vin);
+      } else {
+        ocrStatus.textContent = 'No VIN found. Try a clearer photo with better lighting.';
+        ocrBar.style.width = '0%';
+      }
+    }).catch(function(err) {
       ocrProgress.classList.remove('visible');
-      document.getElementById('vinInput').value = vin;
-      decodeVIN(vin);
-    } else {
-      ocrStatus.textContent = 'No VIN found. Try again — better lighting or closer angle helps.';
-      ocrBar.style.width = '0%';
-      captureBtn.textContent = 'Capture & Read VIN';
+      var msg = (err && err.message) ? err.message : 'Unknown error';
+      showStatus('error', 'OCR error: ' + msg);
+      console.error('OCR error:', err);
+    }).finally(function() {
       captureBtn.disabled = false;
-    }
-
-  } catch(e) {
-    ocrProgress.classList.remove('visible');
-    captureBtn.textContent = 'Capture & Read VIN';
-    captureBtn.disabled = false;
-    const msg = (e && e.message) ? e.message : (typeof e === 'string' ? e : 'Unknown error. Check console for details.');
-    showStatus('error', 'OCR error: ' + msg);
-    console.error('OCR error:', e);
-  }
+      captureBtn.textContent = '📷 Take Photo of VIN Text';
+    });
+  };
+  reader.readAsDataURL(file);
 }
 
-
-let selectedDeviceId = null; // manually chosen camera
-
-// ── CAMERA SELECTOR ──────────────────────────────────────
-async function listCameras() {
-  const wrap = document.getElementById('cameraSelectorWrap');
-  const select = document.getElementById('cameraSelect');
-  const btn = document.getElementById('listCamerasBtn');
-
-  btn.textContent = 'Loading cameras...';
-
-  // Need permission first so labels are populated
-  try {
-    const s = await navigator.mediaDevices.getUserMedia({ video: true });
-    s.getTracks().forEach(t => t.stop());
-  } catch(e) {
-    btn.textContent = '🔎 Choose Camera';
-    showStatus('error', 'Camera permission needed to list cameras.');
-    return;
-  }
-
-  try {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const cams = devices.filter(d => d.kind === 'videoinput');
-
-    select.innerHTML = cams.map(function(c, i) {
-      return '<option value="' + c.deviceId + '">' + (c.label || 'Camera ' + i) + '</option>';
-    }).join('');
-
-    // Pre-select currently chosen camera if any
-    if (selectedDeviceId) select.value = selectedDeviceId;
-
-    wrap.style.display = 'block';
-    btn.textContent = '✓ Apply Selected Camera';
-
-    select.onchange = function() {
-      selectedDeviceId = select.value;
-      // Restart scanner if currently running
-      if (scanning) { stopScanner(); toggleScanner(); }
-    };
-
-  } catch(e) {
-    btn.textContent = '🔎 Choose Camera';
-    showStatus('error', 'Could not list cameras: ' + e.message);
-  }
+// ── DECODE VIN ────────────────────────────────────────────
+function useSample(vin) {
+  document.getElementById('vinInput').value = vin;
+  decodeVIN(vin);
 }
-
-async function toggleScanner() {
-  const btn = document.getElementById('scanBtn');
-  if (scanning) { stopScanner(); return; }
-
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    showStatus('error', 'Camera API not available. Make sure you are on HTTPS and using Chrome or Safari.');
-    return;
-  }
-
-  btn.textContent = 'Starting camera...';
-  btn.disabled = true;
-
-  // Test permission first with explicit getUserMedia
-  try {
-    const testStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-    testStream.getTracks().forEach(t => t.stop());
-  } catch(permErr) {
-    btn.textContent = 'Activate Scanner';
-    btn.disabled = false;
-    if (permErr.name === 'NotAllowedError' || permErr.name === 'PermissionDeniedError') {
-      showStatus('error', 'Camera permission denied. Go to Settings → Site Settings → Camera, allow this site, then refresh.');
-    } else if (permErr.name === 'NotFoundError') {
-      showStatus('error', 'No camera found on this device.');
-    } else if (permErr.name === 'NotReadableError') {
-      showStatus('error', 'Camera is in use by another app. Close other apps and try again.');
-    } else {
-      showStatus('error', 'Could not access camera: ' + permErr.message);
-    }
-    return;
-  }
-
-  // Use manually selected camera if set, otherwise auto-detect wide angle
-  let preferredDeviceId = selectedDeviceId;
-  if (!preferredDeviceId) {
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(d => d.kind === 'videoinput');
-      const backCams = videoDevices.filter(d => /facing back/i.test(d.label));
-      const cam0 = backCams.find(d => /camera 0/i.test(d.label));
-      const cam2 = backCams.find(d => /camera 2/i.test(d.label));
-      const chosen = cam0 || cam2 || backCams[0];
-      preferredDeviceId = chosen ? chosen.deviceId : null;
-      console.log('Selected camera:', chosen ? chosen.label : 'none');
-    } catch(e) {}
-  }
-
-  // Start Quagga2 — purpose-built for 1D barcodes like Code 39 (VIN format)
-  const quaggaConstraints = preferredDeviceId
-    ? { deviceId: { exact: preferredDeviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
-    : { facingMode: { exact: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } };
-
-  Quagga.init({
-    inputStream: {
-      name: 'Live',
-      type: 'LiveStream',
-      target: document.getElementById('quaggaViewport'),
-      constraints: quaggaConstraints,
-    },
-    decoder: {
-      readers: ['code_39_reader', 'code_128_reader'],
-      multiple: false
-    },
-    locate: true,
-    locator: {
-      patchSize: 'medium',
-      halfSample: true
-    }
-  }, function(err) {
-    if (err) {
-      btn.textContent = 'Activate Scanner';
-      btn.disabled = false;
-      showStatus('error', 'Scanner failed to start: ' + err + '. Try refreshing the page.');
-      return;
-    }
-
-    Quagga.start();
-    scanning = true;
-
-    // Hide placeholder, show overlay
-    document.getElementById('placeholder').style.display = 'none';
-    document.getElementById('scanOverlay').style.display = 'flex';
-    document.getElementById('scannerHint').style.display = 'block';
-    btn.textContent = 'Stop Scanner';
-    btn.classList.add('scanning');
-    btn.disabled = false;
-  });
-
-  // Listen for successful decode
-  Quagga.onDetected(function(result) {
-    if (!scanning) return;
-    const raw = result.codeResult.code;
-    const vin = raw.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-    if (vin.length === 17 && !/[IOQ]/.test(vin)) {
-      stopScanner();
-      document.getElementById('vinInput').value = vin;
-      decodeVIN(vin);
-    }
-  });
-}
-
-function stopScanner() {
-  try { Quagga.stop(); } catch(e) {}
-  scanning = false;
-  const btn = document.getElementById('scanBtn');
-  btn.textContent = 'Activate Scanner';
-  btn.classList.remove('scanning');
-  document.getElementById('scanOverlay').style.display = 'none';
-  document.getElementById('scannerHint').style.display = 'none';
-  document.getElementById('placeholder').style.display = 'flex';
-  // Clean up Quagga injected elements
-  const viewport = document.getElementById('quaggaViewport');
-  if (viewport) viewport.innerHTML = '';
-}
-
-function useSample(vin) { document.getElementById('vinInput').value = vin; decodeVIN(vin); }
 
 async function decodeVIN(vin) {
-  const input = document.getElementById('vinInput');
-  const v = (typeof vin === 'string' ? vin : input.value).trim().toUpperCase();
+  var input = document.getElementById('vinInput');
+  var v = (typeof vin === 'string' ? vin : input.value).trim().toUpperCase();
 
   if (v.length !== 17) { showStatus('error', 'VIN must be exactly 17 characters. You entered ' + v.length + '.'); return; }
   if (/[IOQ]/.test(v)) { showStatus('error', 'Invalid VIN: VINs cannot contain the letters I, O, or Q.'); return; }
@@ -954,11 +709,14 @@ async function decodeVIN(vin) {
   document.getElementById('decodeBtn').disabled = true;
 
   try {
-    const resp = await fetch('https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValuesExtended/' + v + '?format=json');
+    var resp = await fetch('https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValuesExtended/' + v + '?format=json');
     if (!resp.ok) throw new Error();
-    const data = await resp.json();
-    const r = data.Results[0];
-    if (!r || !r.Make || r.Make === '') { showStatus('error', 'No vehicle found for this VIN. Please verify and try again.'); return; }
+    var data = await resp.json();
+    var r = data.Results[0];
+    if (!r || !r.Make || r.Make === '') {
+      showStatus('error', 'No vehicle found for this VIN. Please verify and try again.');
+      return;
+    }
     showVehicleResult(v, r);
   } catch(e) {
     showStatus('error', 'Failed to decode VIN. Check your internet connection and try again.');
@@ -968,7 +726,7 @@ async function decodeVIN(vin) {
 }
 
 function showStatus(type, msg) {
-  const card = document.getElementById('statusCard');
+  var card = document.getElementById('statusCard');
   card.className = 'status-card visible ' + type;
   if (type === 'loading') {
     card.innerHTML = '<div class="loading-row"><div class="spinner"></div><div class="loading-text">Decoding VIN...</div></div>';
@@ -978,20 +736,20 @@ function showStatus(type, msg) {
 }
 
 function gv(r, key) {
-  const val = r[key];
+  var val = r[key];
   return (val && val !== 'Not Applicable' && val !== '0' && val !== '') ? val : null;
 }
 
 function showVehicleResult(vin, r) {
-  const card = document.getElementById('statusCard');
+  var card = document.getElementById('statusCard');
   card.className = 'status-card visible success';
 
-  const make  = gv(r,'Make')  || 'Unknown';
-  const model = gv(r,'Model') || 'Unknown';
-  const year  = gv(r,'ModelYear') || '—';
-  const trim  = gv(r,'Trim') || gv(r,'Series') || null;
+  var make  = gv(r,'Make')  || 'Unknown';
+  var model = gv(r,'Model') || 'Unknown';
+  var year  = gv(r,'ModelYear') || '—';
+  var trim  = gv(r,'Trim') || gv(r,'Series') || null;
 
-  const specs = [
+  var specs = [
     { label:'Body Style',      val: gv(r,'BodyClass') },
     { label:'Drive Type',      val: gv(r,'DriveType') },
     { label:'Fuel Type',       val: gv(r,'FuelTypePrimary') },
@@ -1004,19 +762,21 @@ function showVehicleResult(vin, r) {
     { label:'Plant',           val: buildPlant(r), full:true },
     { label:'GVWR',            val: gv(r,'GVWR') },
     { label:'Electrification', val: gv(r,'ElectrificationLevel') },
-  ].filter(s => s.val);
+  ].filter(function(s) { return s.val; });
 
-  const specHTML = specs.map(function(s) {
-    return '<div class="spec-item' + (s.full?' full':'') + '">' +
+  var specHTML = specs.map(function(s) {
+    return '<div class="spec-item' + (s.full ? ' full' : '') + '">' +
       '<div class="spec-label">' + s.label + '</div>' +
       '<div class="spec-value">' + s.val + '</div>' +
     '</div>';
   }).join('');
 
-  const trimHTML = trim ? '<div class="vehicle-trim">' + trim + '</div>' : '';
+  var trimHTML = trim ? '<div class="vehicle-trim">' + trim + '</div>' : '';
   addToHistory(vin, year + ' ' + make + ' ' + model);
 
-  const ey = year.replace(/'/g,"\\'"), em = make.replace(/'/g,"\\'"), emd = model.replace(/'/g,"\\'");
+  var ey = year.replace(/'/g,"\\'");
+  var em = make.replace(/'/g,"\\'");
+  var emd = model.replace(/'/g,"\\'");
 
   card.innerHTML =
     '<div class="decoded-badge"><div class="dot"></div> VIN Decoded</div>' +
@@ -1040,16 +800,16 @@ function showVehicleResult(vin, r) {
 }
 
 function openEbay(year, make, model, sort) {
-  const q = encodeURIComponent([year, make, model, 'OEM'].join(' '));
-  const url = 'https://www.ebay.com/sch/i.html?_nkw=' + q
-    + '&_sacat=6030&LH_Sold=1&LH_Complete=1&LH_ItemCondition=4&_sop=' + sort;
+  var q = encodeURIComponent([year, make, model, 'OEM'].join(' '));
+  var url = 'https://www.ebay.com/sch/i.html?_nkw=' + q +
+    '&_sacat=6030&LH_Sold=1&LH_Complete=1&LH_ItemCondition=4&_sop=' + sort;
   window.open(url, '_blank');
 }
 
 function buildEngine(r) {
-  const disp = gv(r,'DisplacementL'), cyl = gv(r,'EngineCylinders');
-  const hp = gv(r,'EngineHP'), config = gv(r,'EngineConfiguration'), turbo = gv(r,'Turbo');
-  let parts = [];
+  var disp = gv(r,'DisplacementL'), cyl = gv(r,'EngineCylinders');
+  var hp = gv(r,'EngineHP'), config = gv(r,'EngineConfiguration'), turbo = gv(r,'Turbo');
+  var parts = [];
   if (disp) parts.push(parseFloat(disp).toFixed(1)+'L');
   if (config && cyl) parts.push(config+'-'+cyl);
   else if (cyl) parts.push(cyl+'-cyl');
@@ -1059,46 +819,11 @@ function buildEngine(r) {
 }
 
 function buildPlant(r) {
-  const parts = [gv(r,'PlantCity'), gv(r,'PlantState'), gv(r,'PlantCountry')].filter(Boolean);
+  var parts = [gv(r,'PlantCity'), gv(r,'PlantState'), gv(r,'PlantCountry')].filter(Boolean);
   return parts.length ? parts.join(', ') : null;
 }
 
-// ── ORIENTATION CORRECTION ───────────────────────────────
-function fixVideoOrientation() {
-  const frame = document.getElementById('scanFrame');
-  if (!frame) return;
-
-  let angle = 0;
-  if (window.screen && window.screen.orientation && window.screen.orientation.angle !== undefined) {
-    angle = window.screen.orientation.angle;
-  } else if (typeof window.orientation !== 'undefined') {
-    angle = window.orientation;
-    if (angle < 0) angle += 360;
-  }
-
-  // In landscape (90 or 270), rotate the scan frame to vertical
-  // so it aligns with how the camera sees the barcode
-  if (angle === 90 || angle === 270) {
-    frame.classList.add('rotated');
-  } else {
-    frame.classList.remove('rotated');
-  }
-}
-
-window.addEventListener('orientationchange', function() {
-  setTimeout(fixVideoOrientation, 300);
-});
-
-if (window.screen && window.screen.orientation) {
-  window.screen.orientation.addEventListener('change', function() {
-    setTimeout(fixVideoOrientation, 300);
-  });
-}
-
 renderHistory();
-fixVideoOrientation();
-document.getElementById('listCamerasBtn').addEventListener('click', listCameras);
-document.getElementById('listCamerasBtn').addEventListener('click', listCameras);
 </script>
 </body>
 </html>
