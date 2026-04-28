@@ -119,18 +119,28 @@
 
   #preview { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-  /* Rotation correction for portrait device in landscape stream */
-  #preview.rotate-90  { transform: rotate(90deg)  scale(1.35); transform-origin: center; }
-  #preview.rotate-180 { transform: rotate(180deg) scale(1); transform-origin: center; }
-  #preview.rotate-270 { transform: rotate(270deg) scale(1.35); transform-origin: center; }
-
   .scan-overlay {
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
     pointer-events: none;
   }
 
-  .scan-frame { position: relative; width: 75%; height: 28%; }
+  .scan-frame { position: relative; width: 75%; height: 28%; transition: all 0.3s ease; }
+
+  /* In landscape, VIN barcodes are vertical so rotate the frame 90 degrees */
+  .scan-frame.rotated { width: 28%; height: 75%; }
+
+  .scan-frame.rotated .scan-line {
+    top: 0; bottom: 0; left: 50%;
+    right: auto; width: 1px; height: 100%;
+    background: var(--accent);
+    animation: scanMoveH 2s ease-in-out infinite;
+  }
+
+  @keyframes scanMoveH {
+    0%,100% { transform: translateX(-16px); opacity:.4; }
+    50% { transform: translateX(16px); opacity:1; }
+  }
 
   .scan-frame::before, .scan-frame::after, .corner-br, .corner-bl {
     content: ''; position: absolute; width: 20px; height: 20px;
@@ -460,7 +470,7 @@
           <span id="placeholderText">Tap Activate Scanner to scan a VIN barcode</span>
         </div>
         <div class="scan-overlay" id="scanOverlay" style="display:none">
-          <div class="scan-frame">
+          <div class="scan-frame" id="scanFrame">
             <div class="corner-br"></div>
             <div class="corner-bl"></div>
             <div class="scan-line"></div>
@@ -537,7 +547,7 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.3.3</footer>
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.3.4</footer>
 </div>
 
 <script>
@@ -672,7 +682,6 @@ async function captureAndRead() {
       document.getElementById('scannerHint').style.display = 'block';
       captureBtn.textContent = 'Capture & Read VIN';
       captureBtn.disabled = false;
-      fixVideoOrientation();
     } catch(e) {
       captureBtn.textContent = 'Capture & Read VIN';
       captureBtn.disabled = false;
@@ -803,7 +812,6 @@ async function toggleScanner() {
     btn.textContent = 'Stop Scanner';
     btn.classList.add('scanning');
     btn.disabled = false;
-    fixVideoOrientation();
 
   } catch(e) {
     btn.textContent = 'Activate Scanner';
@@ -948,10 +956,8 @@ function buildPlant(r) {
 
 // ── ORIENTATION CORRECTION ───────────────────────────────
 function fixVideoOrientation() {
-  const preview = document.getElementById('preview');
-  if (!preview.srcObject) return;
-
-  preview.classList.remove('rotate-90', 'rotate-180', 'rotate-270');
+  const frame = document.getElementById('scanFrame');
+  if (!frame) return;
 
   let angle = 0;
   if (window.screen && window.screen.orientation && window.screen.orientation.angle !== undefined) {
@@ -961,9 +967,13 @@ function fixVideoOrientation() {
     if (angle < 0) angle += 360;
   }
 
-  if (angle === 90)  preview.classList.add('rotate-270');
-  if (angle === 270) preview.classList.add('rotate-90');
-  if (angle === 180) preview.classList.add('rotate-180');
+  // In landscape (90 or 270), rotate the scan frame to vertical
+  // so it aligns with how the camera sees the barcode
+  if (angle === 90 || angle === 270) {
+    frame.classList.add('rotated');
+  } else {
+    frame.classList.remove('rotated');
+  }
 }
 
 window.addEventListener('orientationchange', function() {
@@ -977,6 +987,7 @@ if (window.screen && window.screen.orientation) {
 }
 
 renderHistory();
+fixVideoOrientation();
 </script>
 </body>
 </html>
