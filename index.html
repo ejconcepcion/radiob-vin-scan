@@ -554,7 +554,7 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.4.7</footer>
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.4.9</footer>
 </div>
 
 <script>
@@ -678,14 +678,16 @@ async function captureAndRead() {
     try {
       captureBtn.textContent = 'Starting camera...';
       captureBtn.disabled = true;
-      // Pick wide-angle camera same way as barcode scanner
+      // Pick wide-angle camera — prefer "camera 0" (main lens)
       let ocrDeviceId = null;
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter(d => d.kind === 'videoinput');
-        const filtered = videoDevices.filter(d => !/telephoto|periscope|zoom|tele/i.test(d.label));
-        const wide = filtered.find(d => /wide|back|rear|0/i.test(d.label));
-        ocrDeviceId = wide ? wide.deviceId : (filtered.length > 0 ? filtered[0].deviceId : null);
+        const backCams = videoDevices.filter(d => /facing back/i.test(d.label));
+        const cam0 = backCams.find(d => /camera 0/i.test(d.label));
+        const cam2 = backCams.find(d => /camera 2/i.test(d.label));
+        const chosen = cam0 || cam2 || backCams[0];
+        ocrDeviceId = chosen ? chosen.deviceId : null;
       } catch(e) {}
 
       const ocrConstraints = ocrDeviceId
@@ -840,11 +842,19 @@ async function toggleScanner() {
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const videoDevices = devices.filter(d => d.kind === 'videoinput');
-    // Exclude any camera labeled telephoto, periscope, or zoom
-    const filtered = videoDevices.filter(d => !/telephoto|periscope|zoom|tele/i.test(d.label));
-    // Prefer ones explicitly labeled wide or back, otherwise take the first rear camera
-    const wide = filtered.find(d => /wide|back|rear|0/i.test(d.label));
-    preferredDeviceId = wide ? wide.deviceId : (filtered.length > 0 ? filtered[0].deviceId : null);
+
+    // Priority order: camera 0 (main) > camera 2 (ultrawide) > camera 3 (telephoto)
+    // Explicitly avoid front-facing and telephoto
+    const backCams = videoDevices.filter(d => /facing back/i.test(d.label));
+
+    // Prefer "camera 0" which is typically the main wide lens
+    const cam0 = backCams.find(d => /camera 0/i.test(d.label));
+    const cam2 = backCams.find(d => /camera 2/i.test(d.label));
+    const fallback = backCams[0];
+
+    const chosen = cam0 || cam2 || fallback;
+    preferredDeviceId = chosen ? chosen.deviceId : null;
+    console.log('Selected camera:', chosen ? chosen.label : 'none');
   } catch(e) {}
 
   // Start Quagga2 — purpose-built for 1D barcodes like Code 39 (VIN format)
@@ -1071,6 +1081,7 @@ if (window.screen && window.screen.orientation) {
 
 renderHistory();
 fixVideoOrientation();
+document.getElementById('listCamerasBtn').addEventListener('click', listCameras);
 document.getElementById('listCamerasBtn').addEventListener('click', listCameras);
 </script>
 </body>
