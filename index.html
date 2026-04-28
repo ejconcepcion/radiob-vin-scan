@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>RadioB VIN Scan</title>
 <script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
+<script src="https://unpkg.com/tesseract.js@4/dist/tesseract.min.js"></script>
 <style>
   :root {
     --bg: #f5f5f5;
@@ -32,6 +33,59 @@
   }
 
   .app { max-width: 480px; margin: 0 auto; padding-bottom: 40px; }
+
+  /* Landscape layout */
+  @media (orientation: landscape) and (max-height: 500px) {
+    .app { max-width: 100%; }
+
+    header { padding: 10px 16px; }
+
+    .logo-sub { display: none; }
+
+    .section { padding: 10px 16px; }
+
+    .section-title { margin-bottom: 6px; }
+
+    /* Side-by-side layout: camera left, controls right */
+    .scanner-layout {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .scanner-layout .scanner-viewport {
+      flex: 1;
+      aspect-ratio: 4/3;
+      min-width: 0;
+    }
+
+    .scanner-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 180px;
+      flex-shrink: 0;
+    }
+
+    .mode-toggle { flex-direction: column; margin-bottom: 0; }
+
+    .btn-primary, .btn-capture { margin-top: 0; }
+
+    .ocr-progress { margin-top: 6px; }
+
+    /* Compact manual entry */
+    .manual-section { padding: 8px 16px 12px; }
+
+    /* Hide samples in landscape to save space */
+    .samples { display: none; }
+
+    footer { padding: 8px; }
+  }
+
+  /* General responsive tweaks for wider screens */
+  @media (min-width: 600px) {
+    .app { max-width: 560px; }
+  }
 
   /* Header */
   header {
@@ -317,6 +371,58 @@
     margin-bottom: 2px; font-family: inherit; letter-spacing: 0;
   }
 
+  /* Mode toggle */
+  .mode-toggle {
+    display: flex; flex-direction: row; gap: 6px; margin-bottom: 12px;
+  }
+
+  .btn-mode {
+    flex: 1; padding: 8px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; font-size: 13px; font-weight: 500;
+    color: var(--muted); cursor: pointer; transition: all 0.15s;
+  }
+
+  .btn-mode.active {
+    background: var(--accent); border-color: var(--accent);
+    color: #fff;
+  }
+
+  /* OCR capture button */
+  .btn-capture {
+    width: 100%; margin-top: 10px; padding: 13px;
+    background: #fff; border: 2px solid var(--accent);
+    border-radius: 8px; font-size: 15px; font-weight: 600;
+    color: var(--accent); cursor: pointer; transition: all 0.15s;
+  }
+
+  .btn-capture:active { background: #e8f0fd; }
+  .btn-capture:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* OCR progress */
+  .ocr-progress {
+    margin-top: 10px; display: none;
+  }
+
+  .ocr-progress.visible { display: block; }
+
+  .ocr-bar-wrap {
+    height: 4px; background: var(--border); border-radius: 2px; overflow: hidden;
+  }
+
+  .ocr-bar {
+    height: 100%; background: var(--accent);
+    border-radius: 2px; width: 0%;
+    transition: width 0.2s;
+  }
+
+  .ocr-status {
+    font-size: 11px; color: var(--muted); margin-top: 5px; text-align: center;
+  }
+
+  /* Hidden canvas for frame capture */
+  #captureCanvas { display: none; }
+
   footer { text-align: center; padding: 16px; font-size: 11px; color: var(--muted); }
 </style>
 </head>
@@ -333,30 +439,53 @@
 
   <div class="section">
     <div class="section-title">Camera Scanner</div>
-    <div class="scanner-viewport">
-      <video id="preview" playsinline></video>
-      <div class="camera-placeholder" id="placeholder">
-        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-          <circle cx="12" cy="13" r="4"/>
-        </svg>
-        <span>Tap Activate Scanner to use your camera and scan a VIN barcode</span>
+
+    <div class="scanner-layout">
+      <div class="scanner-viewport">
+        <video id="preview" playsinline></video>
+        <canvas id="captureCanvas"></canvas>
+        <div class="camera-placeholder" id="placeholder">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+          <span id="placeholderText">Tap Activate Scanner to scan a VIN barcode</span>
+        </div>
+        <div class="scan-overlay" id="scanOverlay" style="display:none">
+          <div class="scan-frame">
+            <div class="corner-br"></div>
+            <div class="corner-bl"></div>
+            <div class="scan-line"></div>
+          </div>
+        </div>
+        <div class="scanner-hint" id="scannerHint" style="display:none">Align VIN barcode within frame</div>
       </div>
-      <div class="scan-overlay" id="scanOverlay" style="display:none">
-        <div class="scan-frame">
-          <div class="corner-br"></div>
-          <div class="corner-bl"></div>
-          <div class="scan-line"></div>
+
+      <div class="scanner-controls">
+        <!-- Mode toggle -->
+        <div class="mode-toggle">
+          <button class="btn-mode active" id="modeBarcodeBtn" onclick="setMode('barcode')">📷 Scan Barcode</button>
+          <button class="btn-mode" id="modeOcrBtn" onclick="setMode('ocr')">🔤 Read VIN Text</button>
+        </div>
+
+        <!-- Barcode button -->
+        <button class="btn-primary" id="scanBtn" onclick="toggleScanner()">Activate Scanner</button>
+
+        <!-- OCR button -->
+        <button class="btn-capture" id="captureBtn" onclick="captureAndRead()" style="display:none">Capture & Read VIN</button>
+
+        <!-- OCR progress -->
+        <div class="ocr-progress" id="ocrProgress">
+          <div class="ocr-bar-wrap"><div class="ocr-bar" id="ocrBar"></div></div>
+          <div class="ocr-status" id="ocrStatus">Initializing OCR...</div>
         </div>
       </div>
-      <div class="scanner-hint" id="scannerHint" style="display:none">Align VIN barcode within frame</div>
     </div>
-    <button class="btn-primary" id="scanBtn" onclick="toggleScanner()">Activate Scanner</button>
   </div>
 
   <div class="divider">or enter manually</div>
 
-  <div style="padding: 0 16px 16px;">
+  <div class="manual-section" style="padding: 0 16px 16px;">
     <div class="section-title">Manual Entry</div>
     <div class="input-wrap">
       <input class="vin-input" id="vinInput" type="text" maxlength="17"
@@ -400,7 +529,7 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.2.0</footer>
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.3.1</footer>
 </div>
 
 <script>
@@ -461,7 +590,152 @@ function loadFromHistory(vin) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-async function toggleScanner() {
+// ── MODE SWITCHING ───────────────────────────────────────
+let currentMode = 'barcode';
+let ocrStream = null;
+
+function setMode(mode) {
+  currentMode = mode;
+  stopScanner();
+  stopOcrCamera();
+
+  const barcodeBtn = document.getElementById('modeBarcodeBtn');
+  const ocrBtn = document.getElementById('modeOcrBtn');
+  const scanBtn = document.getElementById('scanBtn');
+  const captureBtn = document.getElementById('captureBtn');
+  const placeholder = document.getElementById('placeholderText');
+  const ocrProgress = document.getElementById('ocrProgress');
+
+  ocrProgress.classList.remove('visible');
+
+  if (mode === 'barcode') {
+    barcodeBtn.classList.add('active');
+    ocrBtn.classList.remove('active');
+    scanBtn.style.display = 'block';
+    captureBtn.style.display = 'none';
+    placeholder.textContent = 'Tap Activate Scanner to scan a VIN barcode';
+    document.getElementById('scannerHint').textContent = 'Align VIN barcode within frame';
+  } else {
+    ocrBtn.classList.add('active');
+    barcodeBtn.classList.remove('active');
+    scanBtn.style.display = 'none';
+    captureBtn.style.display = 'block';
+    placeholder.textContent = 'Tap Capture & Read VIN to read VIN text with your camera';
+    document.getElementById('scannerHint').textContent = 'Hold steady — point at VIN plate or door sticker';
+  }
+}
+
+function stopOcrCamera() {
+  if (ocrStream) { ocrStream.getTracks().forEach(t => t.stop()); ocrStream = null; }
+  const preview = document.getElementById('preview');
+  if (preview.srcObject) { preview.srcObject = null; }
+  document.getElementById('placeholder').style.display = 'flex';
+  document.getElementById('scanOverlay').style.display = 'none';
+  document.getElementById('scannerHint').style.display = 'none';
+  const captureBtn = document.getElementById('captureBtn');
+  captureBtn.disabled = false;
+  captureBtn.textContent = 'Capture & Read VIN';
+}
+
+async function captureAndRead() {
+  const captureBtn = document.getElementById('captureBtn');
+  const ocrProgress = document.getElementById('ocrProgress');
+  const ocrBar = document.getElementById('ocrBar');
+  const ocrStatus = document.getElementById('ocrStatus');
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showStatus('error', 'Camera not available. Make sure you are on HTTPS.');
+    return;
+  }
+
+  // First tap: start camera so user can frame the shot
+  if (!ocrStream) {
+    try {
+      captureBtn.textContent = 'Starting camera...';
+      captureBtn.disabled = true;
+      ocrStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
+      const preview = document.getElementById('preview');
+      preview.srcObject = ocrStream;
+      await preview.play();
+      document.getElementById('placeholder').style.display = 'none';
+      document.getElementById('scanOverlay').style.display = 'flex';
+      document.getElementById('scannerHint').style.display = 'block';
+      captureBtn.textContent = 'Capture & Read VIN';
+      captureBtn.disabled = false;
+    } catch(e) {
+      captureBtn.textContent = 'Capture & Read VIN';
+      captureBtn.disabled = false;
+      if (e.name === 'NotAllowedError') {
+        showStatus('error', 'Camera permission denied. Allow camera access in browser settings and refresh.');
+      } else {
+        showStatus('error', 'Could not start camera: ' + e.message);
+      }
+    }
+    return;
+  }
+
+  // Second tap: capture frame and run OCR
+  captureBtn.textContent = 'Reading...';
+  captureBtn.disabled = true;
+  ocrProgress.classList.add('visible');
+  ocrBar.style.width = '5%';
+  ocrStatus.textContent = 'Capturing frame...';
+
+  try {
+    const preview = document.getElementById('preview');
+    const canvas = document.getElementById('captureCanvas');
+    canvas.width = preview.videoWidth;
+    canvas.height = preview.videoHeight;
+    canvas.getContext('2d').drawImage(preview, 0, 0);
+
+    ocrBar.style.width = '15%';
+    ocrStatus.textContent = 'Loading OCR engine...';
+
+    const worker = await Tesseract.createWorker('eng', 1, {
+      logger: function(m) {
+        if (m.status === 'recognizing text') {
+          ocrBar.style.width = Math.round(15 + m.progress * 80) + '%';
+          ocrStatus.textContent = 'Reading text... ' + Math.round(m.progress * 100) + '%';
+        }
+      }
+    });
+
+    await worker.setParameters({ tessedit_char_whitelist: 'ABCDEFGHJKLMNPRSTUVWXYZ0123456789' });
+
+    const { data: { text } } = await worker.recognize(canvas);
+    await worker.terminate();
+
+    ocrBar.style.width = '100%';
+    ocrStatus.textContent = 'Scanning for VIN pattern...';
+
+    // Clean text and look for 17-char VIN pattern (no I, O, Q)
+    const cleaned = text.replace(/[^A-HJ-NPR-Z0-9]/gi, ' ').toUpperCase();
+    const match = cleaned.match(/\b[A-HJ-NPR-Z0-9]{17}\b/);
+
+    if (match) {
+      const vin = match[0];
+      stopOcrCamera();
+      ocrProgress.classList.remove('visible');
+      document.getElementById('vinInput').value = vin;
+      decodeVIN(vin);
+    } else {
+      ocrStatus.textContent = 'No VIN found. Try again — better lighting or closer angle helps.';
+      ocrBar.style.width = '0%';
+      captureBtn.textContent = 'Capture & Read VIN';
+      captureBtn.disabled = false;
+    }
+
+  } catch(e) {
+    ocrProgress.classList.remove('visible');
+    captureBtn.textContent = 'Capture & Read VIN';
+    captureBtn.disabled = false;
+    showStatus('error', 'OCR error: ' + e.message);
+  }
+}
+
+
   const btn = document.getElementById('scanBtn');
   if (scanning) { stopScanner(); return; }
 
