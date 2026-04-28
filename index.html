@@ -707,11 +707,6 @@ async function captureAndRead() {
       }
     });
 
-    await worker.setParameters({
-      tessedit_char_whitelist: 'ABCDEFGHJKLMNPRSTUVWXYZ0123456789',
-      tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
-    });
-
     const { data: { text } } = await worker.recognize(canvas);
     await worker.terminate();
 
