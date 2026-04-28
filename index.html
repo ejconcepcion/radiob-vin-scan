@@ -6,9 +6,12 @@
 <meta name="theme-color" content="#f5f5f5">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>RadioB VIN Scan</title>
 <script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
-<script src="https://unpkg.com/tesseract.js@4.1.4/dist/tesseract.min.js"></script>
+<script src="https://unpkg.com/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
 <style>
   :root {
     --bg: #f5f5f5;
@@ -529,7 +532,7 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.3.1</footer>
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.3.2</footer>
 </div>
 
 <script>
@@ -693,22 +696,17 @@ async function captureAndRead() {
     ocrBar.style.width = '15%';
     ocrStatus.textContent = 'Loading OCR engine...';
 
-    const worker = await Tesseract.createWorker('eng', Tesseract.OEM.LSTM_ONLY, {
+    const { data: { text } } = await Tesseract.recognize(canvas, 'eng', {
       logger: function(m) {
         if (m.status === 'recognizing text') {
           ocrBar.style.width = Math.round(15 + m.progress * 80) + '%';
           ocrStatus.textContent = 'Reading text... ' + Math.round(m.progress * 100) + '%';
-        } else if (m.status === 'loading tesseract core') {
-          ocrStatus.textContent = 'Loading OCR engine...';
-        } else if (m.status === 'initializing api') {
-          ocrStatus.textContent = 'Initializing...';
-          ocrBar.style.width = '20%';
+        } else if (m.status === 'loading language traineddata') {
+          ocrStatus.textContent = 'Loading language data...';
+          ocrBar.style.width = '10%';
         }
       }
     });
-
-    const { data: { text } } = await worker.recognize(canvas);
-    await worker.terminate();
 
     ocrBar.style.width = '100%';
     ocrStatus.textContent = 'Scanning for VIN pattern...';
