@@ -702,8 +702,25 @@ function handleOcrPhoto(file) {
       ocrStatus.textContent = 'Scanning for VIN pattern...';
 
       var text = result.data.text;
+      console.log('RAW OCR TEXT:', text);
+
+      // Show raw text for debugging
+      var debugBox = document.getElementById('ocrDebug');
+      if (debugBox) {
+        debugBox.style.display = 'block';
+        debugBox.textContent = 'Raw OCR output:\n' + text;
+      }
+
       var cleaned = text.replace(/[^A-HJ-NPR-Z0-9]/gi, ' ').toUpperCase();
+      console.log('CLEANED TEXT:', cleaned);
+
+      // Try strict 17-char match first
       var match = cleaned.match(/\b[A-HJ-NPR-Z0-9]{17}\b/);
+
+      // Fallback: look for any 17 consecutive alphanumeric chars
+      if (!match) {
+        match = cleaned.match(/[A-HJ-NPR-Z0-9]{17}/);
+      }
 
       if (match) {
         var vin = match[0];
@@ -712,7 +729,7 @@ function handleOcrPhoto(file) {
         setTimeout(function() { ocrProgress.classList.remove('visible'); }, 1000);
         decodeVIN(vin);
       } else {
-        ocrStatus.textContent = 'No VIN found. Try a clearer photo with better lighting.';
+        ocrStatus.textContent = 'No VIN found. See raw text below — try manual entry if you can see the VIN.';
         ocrBar.style.width = '0%';
       }
     }).catch(function(err) {
