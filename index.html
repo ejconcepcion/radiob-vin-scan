@@ -139,6 +139,25 @@
 
   .btn-retake:hover { border-color: var(--accent); color: var(--accent); }
 
+  .btn-lens {
+    width: 100%; margin-top: 8px; padding: 11px;
+    background: #fff;
+    border: 1px solid #4285f4;
+    border-radius: 8px;
+    font-size: 14px; font-weight: 600;
+    color: #4285f4;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: background 0.15s;
+  }
+
+  .btn-lens:hover { background: #e8f0fe; }
+
+  .lens-hint {
+    font-size: 11px; color: var(--muted);
+    text-align: center; margin-top: 6px; line-height: 1.5;
+  }
+
   /* OCR progress */
   .ocr-progress { margin-top: 10px; display: none; }
   .ocr-progress.visible { display: block; }
@@ -355,63 +374,28 @@
     </div>
   </header>
 
-  <!-- Camera Capture Section -->
+  <!-- Google Lens Section -->
   <div class="section">
-    <div class="section-title">Camera Capture</div>
-
-    <div class="scanner-layout">
-      <!-- Photo preview viewport -->
-      <div class="photo-viewport" id="photoViewport">
-        <div class="camera-placeholder" id="placeholder">
-          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-            <circle cx="12" cy="13" r="4"/>
-          </svg>
-          <span id="placeholderText">Take a photo of the VIN barcode sticker</span>
-        </div>
-        <img id="photoPreview" alt="Captured VIN photo">
-      </div>
-
-      <div class="scanner-controls">
-        <!-- Mode toggle -->
-        <div class="mode-toggle">
-          <button class="btn-mode active" id="modeBarcodeBtn" onclick="setMode('barcode')">📷 Barcode</button>
-          <button class="btn-mode" id="modeOcrBtn" onclick="setMode('ocr')">🔤 VIN Text</button>
-        </div>
-
-        <!-- Hidden file input — triggers native camera -->
-        <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none">
-
-        <!-- Barcode photo button -->
-        <button class="btn-primary" id="scanBtn" onclick="triggerPhoto('barcode')">📷 Take Photo of Barcode</button>
-
-        <!-- OCR text photo button -->
-        <button class="btn-capture" id="captureBtn" onclick="triggerPhoto('ocr')">📷 Take Photo of VIN Text</button>
-
-        <!-- Retake button -->
-        <button class="btn-retake" id="retakeBtn" onclick="retakePhoto()">↩ Retake Photo</button>
-
-        <!-- Progress bar -->
-        <div class="ocr-progress" id="ocrProgress">
-          <div class="ocr-bar-wrap"><div class="ocr-bar" id="ocrBar"></div></div>
-          <div class="ocr-status" id="ocrStatus"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Debug output -->
-    <div id="ocrDebug" style="display:none;margin-top:10px;padding:10px;background:#f9f9f9;border:1px solid #ddd;border-radius:6px;font-size:11px;font-family:'Courier New',monospace;color:#333;white-space:pre-wrap;word-break:break-all;max-height:150px;overflow-y:auto;"></div>
+    <div class="section-title">Scan VIN with Camera</div>
+    <button class="btn-lens" onclick="openGoogleLens()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      Open Google Lens
+    </button>
+    <div class="lens-hint">Point Lens at the VIN plate or sticker → copy the VIN → paste below</div>
   </div>
 
-  <div class="divider">or enter manually</div>
+  <div class="divider">or enter VIN manually</div>
 
   <!-- Manual Entry -->
   <div class="manual-section">
     <div class="section-title">Manual Entry</div>
     <div class="input-wrap">
       <input class="vin-input" id="vinInput" type="text" maxlength="17"
-        placeholder="Enter 17-character VIN..."
+        placeholder="Enter or paste 17-character VIN..."
         oninput="this.value=this.value.toUpperCase()"
+        onpaste="setTimeout(function(){var v=document.getElementById('vinInput').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');if(v.length===17){document.getElementById('vinInput').value=v;decodeVIN(v);}},100)"
         onkeydown="if(event.key==='Enter')decodeVIN()">
       <button class="btn-decode" id="decodeBtn" onclick="decodeVIN()">Decode</button>
     </div>
@@ -453,7 +437,7 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.6.5</footer>
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.7.0</footer>
 </div>
 
 <script>
@@ -751,6 +735,25 @@ function handleOcrPhoto(file) {
 }
 
 // ── DECODE VIN ────────────────────────────────────────────
+function openGoogleLens() {
+  // Try to open Google Lens via intent on Android
+  // Falls back to Google Lens web if intent not supported
+  var intentUrl = 'intent://lens.google.com/v3/locationselection#Intent;scheme=https;package=com.google.ar.lens;end';
+  var webUrl = 'https://lens.google.com';
+
+  // On Android Chrome, try the intent URL first
+  var isAndroid = /android/i.test(navigator.userAgent);
+  if (isAndroid) {
+    window.location.href = intentUrl;
+    // Fall back to web after short delay if intent fails
+    setTimeout(function() {
+      window.open(webUrl, '_blank');
+    }, 1500);
+  } else {
+    window.open(webUrl, '_blank');
+  }
+}
+
 function useSample(vin) {
   document.getElementById('vinInput').value = vin;
   decodeVIN(vin);
