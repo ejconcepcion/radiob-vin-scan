@@ -307,6 +307,30 @@
   .btn-ebay:hover { border-color: var(--accent); color: var(--accent); background: #e8f0fd; }
 
   .ebay-note { margin-top: 7px; font-size: 11px; color: var(--muted); text-align: center; }
+
+  .custom-search {
+    display: flex; gap: 6px; margin-top: 8px;
+  }
+
+  .custom-part-input {
+    flex: 1; padding: 9px 12px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; font-size: 13px; color: var(--text);
+    outline: none; transition: border-color 0.15s;
+  }
+
+  .custom-part-input:focus { border-color: var(--accent); }
+  .custom-part-input::placeholder { color: var(--muted); }
+
+  .btn-custom-search {
+    padding: 9px 12px;
+    background: var(--accent); border: none; border-radius: 8px;
+    color: #fff; cursor: pointer; display: flex; align-items: center;
+    transition: opacity 0.15s; flex-shrink: 0;
+  }
+
+  .btn-custom-search:hover { opacity: 0.85; }
+  .btn-custom-search:active { opacity: 0.7; }
   .source-note { margin-top: 12px; font-size: 11px; color: var(--muted); text-align: center; }
 
   /* History */
@@ -461,7 +485,7 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.7.1</footer>
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.7.2</footer>
 </div>
 
 <script>
@@ -888,11 +912,28 @@ function showVehicleResult(vin, r) {
     '<hr class="section-divider">' +
     '<div class="ebay-label">Search eBay — Used OEM Parts (Sold Listings)</div>' +
     '<div class="part-buttons">' + partButtons + '</div>' +
+    '<div class="custom-search">' +
+      '<input type="text" id="customPart" class="custom-part-input" placeholder="Search a specific part..." ' +
+        'onkeydown="if(event.key===\'Enter\')searchCustomPart(\'' + ey + '\',\'' + em + '\',\'' + emd + '\')">' +
+      '<button class="btn-custom-search" onclick="searchCustomPart(\'' + ey + '\',\'' + em + '\',\'' + emd + '\')">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
+      '</button>' +
+    '</div>' +
     '<div class="ebay-note">Used OEM · sold listings · eBay Motors · sorted low → high</div>' +
     '<div class="source-note">Source: NHTSA VPIC Database</div>';
 }
 
 function openEbayPart(year, make, model, term) {
+  var q = encodeURIComponent([year, make, model, term].join(' '));
+  var url = 'https://www.ebay.com/sch/i.html?_nkw=' + q +
+    '&_sacat=6030&LH_Sold=1&LH_Complete=1&LH_ItemCondition=4&_sop=15';
+  window.open(url, '_blank');
+}
+
+function searchCustomPart(year, make, model) {
+  var input = document.getElementById('customPart');
+  if (!input || !input.value.trim()) return;
+  var term = input.value.trim();
   var q = encodeURIComponent([year, make, model, term].join(' '));
   var url = 'https://www.ebay.com/sch/i.html?_nkw=' + q +
     '&_sacat=6030&LH_Sold=1&LH_Complete=1&LH_ItemCondition=4&_sop=15';
