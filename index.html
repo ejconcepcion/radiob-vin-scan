@@ -485,7 +485,7 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.7.2</footer>
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.7.5</footer>
 </div>
 
 <script>
@@ -888,8 +888,9 @@ function showVehicleResult(vin, r) {
   var emd = model.replace(/'/g,"\\'");
 
   var parts = [
-    { label:'🔧 Engine & Transmission',   term:'engine transmission' },
-    { label:'💻 ECU / PCM',               term:'ECU PCM engine computer' },
+    { label:'🔧 Engine',                  term:'engine OEM' },
+    { label:'⚙️ Transmission',            term:'transmission OEM' },
+    { label:'🖥️ Modules',                 term:'ECU PCM BCM module OEM' },
     { label:'📺 Infotainment / Nav',       term:'infotainment navigation radio OEM' },
     { label:'💡 Headlights & Taillights', term:'headlight taillight assembly LED' },
     { label:'🪑 Seats & Interior Trim',   term:'seat interior trim' },
@@ -919,14 +920,14 @@ function showVehicleResult(vin, r) {
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
       '</button>' +
     '</div>' +
-    '<div class="ebay-note">Used OEM · sold listings · eBay Motors · sorted low → high</div>' +
+    '<div class="ebay-note">Used OEM · sold listings · eBay Motors · sorted high → low</div>' +
     '<div class="source-note">Source: NHTSA VPIC Database</div>';
 }
 
 function openEbayPart(year, make, model, term) {
   var q = encodeURIComponent([year, make, model, term].join(' '));
   var url = 'https://www.ebay.com/sch/i.html?_nkw=' + q +
-    '&_sacat=6030&LH_Sold=1&LH_Complete=1&LH_ItemCondition=4&_sop=15';
+    '&_sacat=6030&LH_Sold=1&LH_Complete=1&LH_ItemCondition=4&_sop=16';
   window.open(url, '_blank');
 }
 
@@ -936,7 +937,7 @@ function searchCustomPart(year, make, model) {
   var term = input.value.trim();
   var q = encodeURIComponent([year, make, model, term].join(' '));
   var url = 'https://www.ebay.com/sch/i.html?_nkw=' + q +
-    '&_sacat=6030&LH_Sold=1&LH_Complete=1&LH_ItemCondition=4&_sop=15';
+    '&_sacat=6030&LH_Sold=1&LH_Complete=1&LH_ItemCondition=4&_sop=16';
   window.open(url, '_blank');
 }
 
