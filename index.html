@@ -10,6 +10,8 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>RadioB VIN Scan</title>
+<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
+<script src="https://unpkg.com/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
 <style>
   :root {
     --bg: #f5f5f5;
@@ -35,6 +37,21 @@
 
   .app { max-width: 480px; margin: 0 auto; padding-bottom: 40px; }
 
+  /* Landscape layout */
+  @media (orientation: landscape) and (max-height: 500px) {
+    .app { max-width: 100%; }
+    header { padding: 10px 16px; }
+    .logo-sub { display: none; }
+    .section { padding: 10px 16px; }
+    .scanner-layout { display: flex; gap: 12px; align-items: flex-start; }
+    .scanner-layout .photo-viewport { flex: 1; min-width: 0; }
+    .scanner-controls { display: flex; flex-direction: column; gap: 8px; width: 180px; flex-shrink: 0; }
+    .mode-toggle { flex-direction: column; margin-bottom: 0; }
+    .btn-primary, .btn-capture { margin-top: 0; }
+    .samples { display: none; }
+    footer { padding: 8px; }
+  }
+
   @media (min-width: 600px) { .app { max-width: 560px; } }
 
   /* Header */
@@ -48,38 +65,110 @@
   .logo-title { font-size: 17px; font-weight: 700; color: #000; }
   .logo-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
 
-
-  /* Google Lens section */
-  .lens-section {
-    padding: 14px 16px;
-    border-bottom: 1px solid var(--border);
-  }
+  /* Section */
+  .section { padding: 16px; border-bottom: 1px solid var(--border); }
 
   .section-title {
     font-size: 11px; font-weight: 600; color: var(--muted);
     text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;
   }
 
+  /* Photo viewport */
+  .photo-viewport {
+    position: relative;
+    background: var(--surface2);
+    border-radius: 8px;
+    overflow: hidden;
+    aspect-ratio: 4/3;
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .photo-viewport img#photoPreview {
+    width: 100%; height: 100%; object-fit: contain;
+    display: none; position: absolute; top: 0; left: 0;
+  }
+
+  .camera-placeholder {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px; color: var(--muted); padding: 20px; text-align: center;
+  }
+
+  .camera-placeholder svg { opacity: 0.3; }
+  .camera-placeholder span { font-size: 13px; line-height: 1.5; }
+
+  /* Mode toggle */
+  .mode-toggle { display: flex; flex-direction: row; gap: 6px; margin-bottom: 10px; }
+
+  .btn-mode {
+    flex: 1; padding: 8px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; font-size: 13px; font-weight: 500;
+    color: var(--muted); cursor: pointer; transition: all 0.15s;
+  }
+
+  .btn-mode.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* Buttons */
+  .btn-primary {
+    width: 100%; margin-top: 10px; padding: 13px;
+    background: var(--accent); border: none; border-radius: 8px;
+    font-size: 15px; font-weight: 600; color: #fff; cursor: pointer;
+    transition: opacity 0.15s;
+  }
+
+  .btn-primary:active { opacity: 0.8; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-capture {
+    width: 100%; margin-top: 10px; padding: 13px;
+    background: #fff; border: 2px solid var(--accent); border-radius: 8px;
+    font-size: 15px; font-weight: 600; color: var(--accent); cursor: pointer;
+    transition: all 0.15s; display: none;
+  }
+
+  .btn-capture:active { background: #e8f0fd; }
+  .btn-capture:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-retake {
+    width: 100%; margin-top: 6px; padding: 9px;
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer;
+    display: none;
+  }
+
+  .btn-retake:hover { border-color: var(--accent); color: var(--accent); }
+
   .btn-lens {
-    width: 100%; padding: 12px;
-    background: #fff; border: 1.5px solid #4285f4;
-    border-radius: 8px; font-size: 14px; font-weight: 600;
-    color: #4285f4; cursor: pointer;
+    width: 100%; margin-top: 8px; padding: 11px;
+    background: #fff;
+    border: 1px solid #4285f4;
+    border-radius: 8px;
+    font-size: 14px; font-weight: 600;
+    color: #4285f4;
+    cursor: pointer;
     display: flex; align-items: center; justify-content: center; gap: 8px;
     transition: background 0.15s;
   }
 
   .btn-lens:hover { background: #e8f0fe; }
-  .btn-lens:active { background: #d2e3fc; }
 
   .lens-hint {
     font-size: 11px; color: var(--muted);
-    text-align: center; margin-top: 7px; line-height: 1.5;
+    text-align: center; margin-top: 6px; line-height: 1.5;
   }
 
+  /* OCR progress */
+  .ocr-progress { margin-top: 10px; display: none; }
+  .ocr-progress.visible { display: block; }
+  .ocr-bar-wrap { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .ocr-bar { height: 100%; background: var(--accent); border-radius: 2px; width: 0%; transition: width 0.2s; }
+  .ocr-status { font-size: 11px; color: var(--muted); margin-top: 5px; text-align: center; }
+
+  /* Divider */
   .divider {
     display: flex; align-items: center; gap: 10px;
-    padding: 10px 16px; color: var(--muted); font-size: 12px;
+    padding: 12px 16px; color: var(--muted); font-size: 12px;
   }
   .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
@@ -315,6 +404,67 @@
   }
 
   footer { text-align: center; padding: 16px; font-size: 11px; color: var(--muted); }
+
+  /* ── Row52 Yard Inventory ──────────────────────────────── */
+  .row52-card {
+    margin: 0 16px 12px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  }
+  .row52-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 14px; border-bottom: 1px solid var(--border);
+  }
+  .row52-title {
+    font-size: 11px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 1px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .row52-form {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    padding: 12px 14px; border-bottom: 1px solid var(--border);
+  }
+  .row52-form .full { grid-column: 1 / -1; }
+  .row52-form label {
+    display: block; font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;
+  }
+  .row52-form input, .row52-form select {
+    width: 100%; padding: 8px 10px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; font-size: 13px; color: var(--text);
+    outline: none; transition: border-color 0.15s;
+    font-family: inherit;
+  }
+  .row52-form input:focus, .row52-form select:focus { border-color: var(--accent); }
+  .row52-actions { display: flex; gap: 6px; padding: 0 14px 12px; }
+  .btn-row52-search {
+    flex: 1; padding: 10px;
+    background: var(--accent); border: none; border-radius: 8px;
+    font-size: 14px; font-weight: 600; color: #fff; cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .btn-row52-search:active { opacity: 0.8; }
+  .btn-row52-open {
+    padding: 10px 12px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; font-size: 13px; color: var(--text);
+    cursor: pointer; white-space: nowrap;
+  }
+  .btn-row52-open:hover { border-color: var(--accent); color: var(--accent); }
+  .row52-frame-wrap {
+    position: relative; display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .row52-frame-wrap.visible { display: block; }
+  .row52-frame {
+    width: 100%; height: 600px; border: 0; background: #fff; display: block;
+  }
+  .row52-frame-status {
+    padding: 8px 14px; font-size: 11px; color: var(--muted);
+    text-align: center; line-height: 1.5;
+  }
+  .row52-frame-status a { color: var(--accent); }
 </style>
 </head>
 <body>
@@ -328,19 +478,16 @@
     </div>
   </header>
 
-
-
   <!-- Google Lens Section -->
-  <div class="lens-section">
+  <div class="section">
     <div class="section-title">Scan VIN with Camera</div>
-    <button class="btn-lens" onclick="openLensWithPhoto()">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <button class="btn-lens" onclick="openGoogleLens()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
       </svg>
-      Search with Google Lens
+      Open Google Lens
     </button>
-    <div class="lens-hint">Take or choose a photo of the VIN plate → Lens reads the text for you</div>
-    <input type="file" id="lensPhotoInput" accept="image/*" capture="environment" style="display:none">
+    <div class="lens-hint">Point Lens at the VIN plate or sticker → copy the VIN → paste below</div>
   </div>
 
   <div class="divider">or enter VIN manually</div>
@@ -394,7 +541,53 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.7.8</footer>
+
+  <!-- Row52 Yard Inventory -->
+  <div class="row52-card" id="row52Card">
+    <div class="row52-header">
+      <div class="row52-title">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2"/>
+          <circle cx="6.5" cy="16.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/>
+        </svg>
+        Yard Inventory (Row52)
+      </div>
+    </div>
+    <div class="row52-form">
+      <div>
+        <label for="row52Make">Make</label>
+        <select id="row52Make"><option value="">Any make</option></select>
+      </div>
+      <div>
+        <label for="row52Year">Year (optional)</label>
+        <input type="text" id="row52Year" placeholder="e.g. 2010 or 2008-2012" maxlength="9">
+      </div>
+      <div>
+        <label for="row52Zip">ZIP code</label>
+        <input type="text" id="row52Zip" inputmode="numeric" maxlength="5" placeholder="94591">
+      </div>
+      <div>
+        <label for="row52Distance">Distance</label>
+        <select id="row52Distance">
+          <option value="10">10 mi</option>
+          <option value="25">25 mi</option>
+          <option value="50" selected>50 mi</option>
+          <option value="100">100 mi</option>
+          <option value="200">200 mi</option>
+        </select>
+      </div>
+    </div>
+    <div class="row52-actions">
+      <button class="btn-row52-search" onclick="searchRow52()">Search Row52</button>
+      <button class="btn-row52-open" onclick="searchRow52(true)" title="Open in new tab">↗</button>
+    </div>
+    <div class="row52-frame-wrap" id="row52FrameWrap">
+      <iframe class="row52-frame" id="row52Frame" referrerpolicy="no-referrer" loading="lazy"></iframe>
+      <div class="row52-frame-status" id="row52FrameStatus"></div>
+    </div>
+  </div>
+
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.8.0</footer>
 </div>
 
 <script>
@@ -462,39 +655,255 @@ function loadFromHistory(vin) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// ── GOOGLE LENS ───────────────────────────────────────────
-function openLensWithPhoto() {
-  var input = document.getElementById('lensPhotoInput');
+// ── MODE SWITCHING ────────────────────────────────────────
+var currentMode = 'barcode';
+
+function setMode(mode) {
+  currentMode = mode;
+  retakePhoto();
+  var barcodeBtn = document.getElementById('modeBarcodeBtn');
+  var ocrBtn = document.getElementById('modeOcrBtn');
+  var scanBtn = document.getElementById('scanBtn');
+  var captureBtn = document.getElementById('captureBtn');
+  document.getElementById('ocrProgress').classList.remove('visible');
+
+  if (mode === 'barcode') {
+    barcodeBtn.classList.add('active');
+    ocrBtn.classList.remove('active');
+    scanBtn.style.display = 'block';
+    captureBtn.style.display = 'none';
+    document.getElementById('placeholderText').textContent = 'Take a photo of the VIN barcode sticker';
+  } else {
+    ocrBtn.classList.add('active');
+    barcodeBtn.classList.remove('active');
+    scanBtn.style.display = 'none';
+    captureBtn.style.display = 'block';
+    document.getElementById('placeholderText').textContent = 'Take a photo of the VIN plate or door sticker text';
+  }
+}
+
+// ── PHOTO CAPTURE ─────────────────────────────────────────
+function triggerPhoto(mode) {
+  var input = document.getElementById('photoInput');
   input.onchange = function(e) {
     var file = e.target.files[0];
     if (!file) return;
     e.target.value = '';
-
-    // Build a form and POST the image directly to Google Lens
-    var form = document.createElement('form');
-    form.method = 'POST';
-    form.action = 'https://lens.google.com/upload';
-    form.enctype = 'multipart/form-data';
-    form.target = '_blank';
-
-    var fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.name = 'encoded_image';
-
-    // Attach file via DataTransfer so the form carries it
-    var dt = new DataTransfer();
-    dt.items.add(file);
-    fileInput.files = dt.files;
-
-    form.appendChild(fileInput);
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
+    if (mode === 'barcode') {
+      handleBarcodePhoto(file);
+    } else {
+      handleOcrPhoto(file);
+    }
   };
   input.click();
 }
 
+function showPhotoPreview(dataUrl) {
+  var preview = document.getElementById('photoPreview');
+  preview.src = dataUrl;
+  preview.style.display = 'block';
+  document.getElementById('placeholder').style.display = 'none';
+  document.getElementById('retakeBtn').style.display = 'block';
+}
+
+function retakePhoto() {
+  document.getElementById('photoPreview').style.display = 'none';
+  document.getElementById('photoPreview').src = '';
+  document.getElementById('placeholder').style.display = 'flex';
+  document.getElementById('retakeBtn').style.display = 'none';
+  document.getElementById('ocrProgress').classList.remove('visible');
+  var debugBox = document.getElementById('ocrDebug');
+  if (debugBox) { debugBox.style.display = 'none'; debugBox.textContent = ''; }
+}
+
+// ── BARCODE PHOTO MODE ────────────────────────────────────
+function handleBarcodePhoto(file) {
+  var ocrProgress = document.getElementById('ocrProgress');
+  var ocrBar = document.getElementById('ocrBar');
+  var ocrStatus = document.getElementById('ocrStatus');
+
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    showPhotoPreview(ev.target.result);
+    ocrProgress.classList.add('visible');
+    ocrBar.style.width = '20%';
+    ocrStatus.textContent = 'Scanning for barcode...';
+
+    // Use BrowserMultiFormatReader which handles still images correctly
+    var codeReader = new ZXing.BrowserMultiFormatReader();
+    var img = new Image();
+    img.onload = function() {
+      try {
+        var canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+
+        var hints = new Map();
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+          ZXing.BarcodeFormat.CODE_39,
+          ZXing.BarcodeFormat.CODE_128
+        ]);
+        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+
+        var reader2 = new ZXing.MultiFormatReader();
+        reader2.setHints(hints);
+
+        // Try original + 90° rotation (barcodes may be sideways in photo)
+        var angles = [0, 90, 270, 180];
+        var found = false;
+
+        for (var a = 0; a < angles.length; a++) {
+          try {
+            var rotCanvas = document.createElement('canvas');
+            var angle = angles[a];
+            if (angle === 90 || angle === 270) {
+              rotCanvas.width = canvas.height;
+              rotCanvas.height = canvas.width;
+            } else {
+              rotCanvas.width = canvas.width;
+              rotCanvas.height = canvas.height;
+            }
+            var rctx = rotCanvas.getContext('2d');
+            rctx.translate(rotCanvas.width/2, rotCanvas.height/2);
+            rctx.rotate(angle * Math.PI / 180);
+            rctx.drawImage(canvas, -canvas.width/2, -canvas.height/2);
+
+            var luminance = new ZXing.RGBLuminanceSource(
+              rctx.getImageData(0, 0, rotCanvas.width, rotCanvas.height).data,
+              rotCanvas.width, rotCanvas.height
+            );
+            var bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
+            var result = reader2.decode(bitmap);
+            var vin = result.getText().replace(/[^A-Z0-9]/gi, '').toUpperCase();
+
+            if (vin.length === 17 && !/[IOQ]/.test(vin)) {
+              ocrBar.style.width = '100%';
+              ocrStatus.textContent = '✓ Barcode found!';
+              document.getElementById('vinInput').value = vin;
+              setTimeout(function() { ocrProgress.classList.remove('visible'); }, 800);
+              decodeVIN(vin);
+              found = true;
+              break;
+            }
+          } catch(e2) { /* try next rotation */ }
+        }
+
+        if (!found) {
+          ocrBar.style.width = '0%';
+          ocrStatus.textContent = 'No barcode detected. Switch to 🔤 VIN Text mode and try again.';
+        }
+      } catch(e) {
+        ocrBar.style.width = '0%';
+        ocrStatus.textContent = 'No barcode detected. Switch to 🔤 VIN Text mode and try again.';
+      }
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── OCR PHOTO MODE ────────────────────────────────────────
+function handleOcrPhoto(file) {
+  var ocrProgress = document.getElementById('ocrProgress');
+  var ocrBar = document.getElementById('ocrBar');
+  var ocrStatus = document.getElementById('ocrStatus');
+  var captureBtn = document.getElementById('captureBtn');
+
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    showPhotoPreview(ev.target.result);
+    captureBtn.disabled = true;
+    captureBtn.textContent = 'Reading...';
+    ocrProgress.classList.add('visible');
+    ocrBar.style.width = '10%';
+    ocrStatus.textContent = 'Loading OCR engine...';
+
+    Tesseract.recognize(ev.target.result, 'eng', {
+      logger: function(m) {
+        if (m.status === 'recognizing text') {
+          ocrBar.style.width = Math.round(10 + m.progress * 85) + '%';
+          ocrStatus.textContent = 'Reading text... ' + Math.round(m.progress * 100) + '%';
+        } else if (m.status === 'loading tesseract core') {
+          ocrStatus.textContent = 'Loading OCR engine...';
+          ocrBar.style.width = '15%';
+        } else if (m.status === 'initializing tesseract') {
+          ocrStatus.textContent = 'Initializing...';
+          ocrBar.style.width = '20%';
+        } else if (m.status === 'loading language traineddata') {
+          ocrStatus.textContent = 'Loading language data...';
+          ocrBar.style.width = '25%';
+        }
+      }
+    }).then(function(result) {
+      ocrBar.style.width = '100%';
+      ocrStatus.textContent = 'Scanning for VIN pattern...';
+
+      var text = result.data.text;
+      console.log('RAW OCR TEXT:', text);
+
+      // Show raw text for debugging
+      var debugBox = document.getElementById('ocrDebug');
+      if (debugBox) {
+        debugBox.style.display = 'block';
+        debugBox.textContent = 'Raw OCR output:\n' + text;
+      }
+
+      var cleaned = text.replace(/[^A-HJ-NPR-Z0-9]/gi, ' ').toUpperCase();
+      console.log('CLEANED TEXT:', cleaned);
+
+      // Try strict 17-char match first
+      var match = cleaned.match(/\b[A-HJ-NPR-Z0-9]{17}\b/);
+
+      // Fallback: look for any 17 consecutive alphanumeric chars
+      if (!match) {
+        match = cleaned.match(/[A-HJ-NPR-Z0-9]{17}/);
+      }
+
+      if (match) {
+        var vin = match[0];
+        document.getElementById('vinInput').value = vin;
+        ocrStatus.textContent = '✓ VIN found: ' + vin;
+        setTimeout(function() { ocrProgress.classList.remove('visible'); }, 1000);
+        decodeVIN(vin);
+      } else {
+        ocrStatus.textContent = 'No VIN found. See raw text below — try manual entry if you can see the VIN.';
+        ocrBar.style.width = '0%';
+      }
+    }).catch(function(err) {
+      ocrProgress.classList.remove('visible');
+      var msg = (err && err.message) ? err.message : JSON.stringify(err);
+      showStatus('error', 'OCR error: ' + msg);
+      console.error('OCR error:', err);
+    }).finally(function() {
+      captureBtn.disabled = false;
+      captureBtn.textContent = '📷 Take Photo of VIN Text';
+    });
+  };
+  reader.readAsDataURL(file);
+}
+
 // ── DECODE VIN ────────────────────────────────────────────
+function openGoogleLens() {
+  // Try to open Google Lens via intent on Android
+  // Falls back to Google Lens web if intent not supported
+  var intentUrl = 'intent://lens.google.com/v3/locationselection#Intent;scheme=https;package=com.google.ar.lens;end';
+  var webUrl = 'https://lens.google.com';
+
+  // On Android Chrome, try the intent URL first
+  var isAndroid = /android/i.test(navigator.userAgent);
+  if (isAndroid) {
+    window.location.href = intentUrl;
+    // Fall back to web after short delay if intent fails
+    setTimeout(function() {
+      window.open(webUrl, '_blank');
+    }, 1500);
+  } else {
+    window.open(webUrl, '_blank');
+  }
+}
+
 function useSample(vin) {
   document.getElementById('vinInput').value = vin;
   decodeVIN(vin);
@@ -575,6 +984,7 @@ function showVehicleResult(vin, r) {
 
   var trimHTML = trim ? '<div class="vehicle-trim">' + trim + '</div>' : '';
   addToHistory(vin, year + ' ' + make + ' ' + model);
+  row52PrefillFromVehicle(year, make);
 
   var ey = year.replace(/'/g,"\\'");
   var em = make.replace(/'/g,"\\'");
@@ -649,6 +1059,133 @@ function buildPlant(r) {
   var parts = [gv(r,'PlantCity'), gv(r,'PlantState'), gv(r,'PlantCountry')].filter(Boolean);
   return parts.length ? parts.join(', ') : null;
 }
+
+
+// ── ROW52 YARD INVENTORY ─────────────────────────────────
+// Make → MakeId map (from row52.com /Makes API, fetched once)
+var ROW52_MAKES = [
+  {id:67, name:"Acura"},{id:70, name:"Alfa Romeo"},{id:72, name:"AMC"},
+  {id:79, name:"Asuna"},{id:80, name:"Audi"},{id:274,name:"Bertone"},
+  {id:90, name:"BMW"},{id:96, name:"Buick"},{id:97, name:"Cadillac"},
+  {id:100,name:"Chevrolet"},{id:106,name:"Chrysler"},{id:111,name:"Daewoo"},
+  {id:112,name:"Daihatsu"},{id:113,name:"Datsun"},{id:117,name:"Dodge"},
+  {id:119,name:"Eagle"},{id:128,name:"Fiat"},{id:132,name:"Ford"},
+  {id:138,name:"Geo"},{id:140,name:"GMC"},{id:145,name:"Honda"},
+  {id:280,name:"Hummer"},{id:147,name:"Hyundai"},{id:149,name:"Infiniti"},
+  {id:150,name:"International"},{id:152,name:"Isuzu"},{id:154,name:"Jaguar"},
+  {id:155,name:"Jeep"},{id:161,name:"Kia"},{id:272,name:"Lancia"},
+  {id:169,name:"Land Rover"},{id:170,name:"Lexus"},{id:171,name:"Lincoln"},
+  {id:273,name:"Maserati"},{id:180,name:"Mazda"},{id:182,name:"Mercedes-Benz"},
+  {id:183,name:"Mercury"},{id:184,name:"Merkur"},{id:258,name:"MG"},
+  {id:185,name:"Mini"},{id:186,name:"Mitsubishi"},{id:267,name:"Nash"},
+  {id:193,name:"Nissan"},{id:194,name:"Oldsmobile"},{id:196,name:"Opel"},
+  {id:203,name:"Peugeot"},{id:205,name:"Plymouth"},{id:207,name:"Pontiac"},
+  {id:208,name:"Porsche"},{id:275,name:"Ram"},{id:266,name:"Rambler"},
+  {id:210,name:"Renault"},{id:214,name:"Saab"},{id:217,name:"Saturn"},
+  {id:218,name:"Scion"},{id:221,name:"Smart"},{id:224,name:"Sterling"},
+  {id:269,name:"Studebaker"},{id:226,name:"Subaru"},{id:227,name:"Suzuki"},
+  {id:234,name:"Toyota"},{id:235,name:"Triumph"},{id:242,name:"Volkswagen"},
+  {id:243,name:"Volvo"},{id:268,name:"Willys"},{id:253,name:"Yugo"}
+];
+
+var ROW52_ZIP_KEY = 'radiob_row52_zip';
+var ROW52_DEFAULT_ZIP = '94591';
+
+function row52FindMakeId(name) {
+  if (!name) return '';
+  var n = name.toLowerCase().replace(/[^a-z]/g, '');
+  // Common NHTSA → Row52 normalizations
+  var aliases = { vw: 'volkswagen', mb: 'mercedesbenz', chevy: 'chevrolet' };
+  if (aliases[n]) n = aliases[n];
+  for (var i = 0; i < ROW52_MAKES.length; i++) {
+    var mn = ROW52_MAKES[i].name.toLowerCase().replace(/[^a-z]/g, '');
+    if (mn === n) return ROW52_MAKES[i].id;
+  }
+  // Fallback: starts-with match (e.g. "mercedes-benz usa" → "mercedes-benz")
+  for (var j = 0; j < ROW52_MAKES.length; j++) {
+    var mn2 = ROW52_MAKES[j].name.toLowerCase().replace(/[^a-z]/g, '');
+    if (n.indexOf(mn2) === 0 || mn2.indexOf(n) === 0) return ROW52_MAKES[j].id;
+  }
+  return '';
+}
+
+function row52BuildUrl(makeId, year, zip, distance) {
+  var p = ['Sort=DateAdded', 'SortDirection=desc', 'Page=1'];
+  if (makeId) p.push('MakeId=' + encodeURIComponent(makeId));
+  if (year)   p.push('Year=' + encodeURIComponent(year));
+  if (zip)    p.push('ZipCode=' + encodeURIComponent(zip));
+  if (distance) p.push('Distance=' + encodeURIComponent(distance));
+  return 'https://row52.com/Search/?' + p.join('&');
+}
+
+function initRow52Panel() {
+  var sel = document.getElementById('row52Make');
+  if (sel && sel.options.length <= 1) {
+    ROW52_MAKES.forEach(function(m) {
+      var o = document.createElement('option');
+      o.value = m.id; o.textContent = m.name;
+      sel.appendChild(o);
+    });
+  }
+  var zipInput = document.getElementById('row52Zip');
+  if (zipInput) {
+    zipInput.value = localStorage.getItem(ROW52_ZIP_KEY) || ROW52_DEFAULT_ZIP;
+    zipInput.addEventListener('change', function() {
+      var v = (zipInput.value || '').replace(/[^0-9]/g, '').slice(0, 5);
+      zipInput.value = v;
+      if (v.length === 5) localStorage.setItem(ROW52_ZIP_KEY, v);
+    });
+  }
+}
+
+function searchRow52(openInNewTab) {
+  var makeId   = document.getElementById('row52Make').value;
+  var year     = (document.getElementById('row52Year').value || '').trim();
+  var zip      = (document.getElementById('row52Zip').value || '').trim();
+  var distance = document.getElementById('row52Distance').value;
+
+  if (!zip || zip.length < 5) {
+    alert('Please enter a 5-digit ZIP code.');
+    return;
+  }
+  localStorage.setItem(ROW52_ZIP_KEY, zip);
+
+  var url = row52BuildUrl(makeId, year, zip, distance);
+
+  if (openInNewTab) {
+    window.open(url, '_blank', 'noopener');
+    return;
+  }
+
+  var wrap   = document.getElementById('row52FrameWrap');
+  var frame  = document.getElementById('row52Frame');
+  var status = document.getElementById('row52FrameStatus');
+
+  wrap.classList.add('visible');
+  frame.src = url;
+
+  // If row52 ever sends X-Frame-Options, the iframe stays empty —
+  // give the user a fallback link after a short delay.
+  status.innerHTML = 'Loading row52.com…';
+  var fallbackUrl = url.replace(/'/g, '%27');
+  setTimeout(function() {
+    status.innerHTML =
+      'Trouble loading inline? <a href="' + fallbackUrl + '" target="_blank" rel="noopener">Open in a new tab ↗</a>';
+  }, 4000);
+}
+
+function row52PrefillFromVehicle(year, make) {
+  // Called from showVehicleResult() so the panel is pre-populated
+  // with the decoded vehicle's year/make.
+  var makeSel = document.getElementById('row52Make');
+  var yearInp = document.getElementById('row52Year');
+  if (!makeSel || !yearInp) return;
+  var id = row52FindMakeId(make);
+  if (id) makeSel.value = id;
+  if (year && /^\d{4}$/.test(year)) yearInp.value = year;
+}
+
+initRow52Panel();
 
 renderHistory();
 </script>
