@@ -975,6 +975,9 @@ function showVehicleResult(vin, r) {
   var isMercedes = /mercedes/i.test(make);
   if (isMercedes) parts.push({ label:'💺 Headrest', term:'headrest OEM' });
 
+  var isBMW = /bmw/i.test(make);
+  if (isBMW) parts.push({ label:'🔌 FRM', term:'FRM footwell module' });
+
   var partButtons = parts.map(function(p) {
     var t = p.term.replace(/'/g,"\\'");
     return '<div class="part-row">' +
