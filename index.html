@@ -991,14 +991,7 @@ function showVehicleResult(vin, r) {
   var emd = model.replace(/'/g,"\\'");
 
   var parts = [
-    { label:'🔧 Engine',                  term:'engine OEM' },
-    { label:'⚙️ Transmission',            term:'transmission OEM' },
-    { label:'🖥️ Modules',                 term:'OEM module' },
-    { label:'📺 Infotainment / Nav',       term:'infotainment navigation radio OEM' },
-    { label:'💡 Headlights & Taillights', term:'headlight taillight assembly LED' },
-    { label:'🪑 Seats & Interior Trim',   term:'seat interior trim' },
-    { label:'⚗️ Catalytic Converter',     term:'catalytic converter OEM' },
-    { label:'🚪 Doors, Fenders & Hoods',  term:'door fender hood' },
+    { label:'🖥️ Modules', term:'OEM module' },
   ];
 
   var partButtons = parts.map(function(p) {
