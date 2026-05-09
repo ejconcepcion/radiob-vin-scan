@@ -943,7 +943,7 @@ function showVehicleResult(vin, r) {
   var trim  = gv(r,'Trim') || gv(r,'Series') || null;
 
   var specs = [
-    { label:'Body Style',      val: gv(r,'BodyClass') },
+    { label:'Body Style',      val: buildBodyStyle(r) },
     { label:'Drive Type',      val: gv(r,'DriveType') },
     { label:'Fuel Type',       val: gv(r,'FuelTypePrimary') },
     { label:'Engine',          val: buildEngine(r) },
@@ -1024,6 +1024,34 @@ function buildEngine(r) {
   if (turbo && turbo.toLowerCase().includes('yes')) parts.push('Turbocharged');
   if (hp) parts.push(hp+' HP');
   return parts.length ? parts.join(' · ') : null;
+}
+
+function buildBodyStyle(r) {
+  var raw = gv(r, 'BodyClass');
+  if (!raw) return null;
+  var map = {
+    'sedan/saloon': 'Sedan',
+    'sedan': 'Sedan',
+    'sport utility vehicle (suv)': 'SUV',
+    'sport utility vehicle': 'SUV',
+    'suv': 'SUV',
+    'pickup': 'Pickup',
+    'pickup truck': 'Pickup',
+    'hatchback/liftback/notchback': 'Hatchback',
+    'hatchback': 'Hatchback',
+    'coupe': 'Coupe',
+    'convertible/cabriolet': 'Convertible',
+    'convertible': 'Convertible',
+    'minivan': 'Minivan',
+    'van': 'Van',
+    'cargo van': 'Cargo Van',
+    'wagon': 'Wagon',
+    'station wagon': 'Wagon',
+    'crossover utility vehicle (cuv)': 'CUV',
+    'roadster': 'Roadster',
+    'low speed vehicle (lsv)': 'LSV',
+  };
+  return map[raw.toLowerCase()] || raw;
 }
 
 function buildPlant(r) {
