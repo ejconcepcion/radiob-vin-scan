@@ -481,12 +481,12 @@
   <!-- Google Lens Section -->
   <div class="section">
     <div class="section-title">Scan VIN with Camera</div>
-    <button class="btn-lens" onclick="openGoogleLens()">
+    <a class="btn-lens" href="https://lens.google.com" target="_blank" rel="noopener">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
       </svg>
       Open Google Lens
-    </button>
+    </a>
     <div class="lens-hint">Point Lens at the VIN plate or sticker → copy the VIN → paste below</div>
   </div>
 
@@ -569,7 +569,7 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.9.3</footer>
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.9.4</footer>
 </div>
 
 <script>
@@ -867,9 +867,6 @@ function handleOcrPhoto(file) {
 }
 
 // ── DECODE VIN ────────────────────────────────────────────
-function openGoogleLens() {
-  window.open('https://lens.google.com', '_blank');
-}
 
 function useSample(vin) {
   document.getElementById('vinInput').value = vin;
