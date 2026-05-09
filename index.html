@@ -946,14 +946,10 @@ function showVehicleResult(vin, r) {
     { label:'Body Style',      val: gv(r,'BodyClass') },
     { label:'Drive Type',      val: gv(r,'DriveType') },
     { label:'Fuel Type',       val: gv(r,'FuelTypePrimary') },
-    { label:'Engine',          val: buildEngine(r), full:true },
+    { label:'Engine',          val: buildEngine(r) },
     { label:'Transmission',    val: gv(r,'TransmissionStyle') },
     { label:'Doors',           val: gv(r,'Doors') ? gv(r,'Doors')+' doors' : null },
     { label:'Seating',         val: gv(r,'Seats') ? gv(r,'Seats')+' seats' : null },
-    { label:'Vehicle Type',    val: gv(r,'VehicleType') },
-    { label:'Manufacturer',    val: gv(r,'ManufacturerName'), full:true },
-    { label:'Plant',           val: buildPlant(r), full:true },
-    { label:'GVWR',            val: gv(r,'GVWR') },
     { label:'Electrification', val: gv(r,'ElectrificationLevel') },
   ].filter(function(s) { return s.val; });
 
