@@ -569,7 +569,7 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.9.2</footer>
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.9.3</footer>
 </div>
 
 <script>
@@ -868,22 +868,7 @@ function handleOcrPhoto(file) {
 
 // ── DECODE VIN ────────────────────────────────────────────
 function openGoogleLens() {
-  // Try to open Google Lens via intent on Android
-  // Falls back to Google Lens web if intent not supported
-  var intentUrl = 'intent://lens.google.com/v3/locationselection#Intent;scheme=https;package=com.google.ar.lens;end';
-  var webUrl = 'https://lens.google.com';
-
-  // On Android Chrome, try the intent URL first
-  var isAndroid = /android/i.test(navigator.userAgent);
-  if (isAndroid) {
-    window.location.href = intentUrl;
-    // Fall back to web after short delay if intent fails
-    setTimeout(function() {
-      window.open(webUrl, '_blank');
-    }, 1500);
-  } else {
-    window.open(webUrl, '_blank');
-  }
+  window.open('https://lens.google.com', '_blank');
 }
 
 function useSample(vin) {
