@@ -569,7 +569,7 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.9.1</footer>
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.9.2</footer>
 </div>
 
 <script>
@@ -944,7 +944,7 @@ function showVehicleResult(vin, r) {
 
   var specs = [
     { label:'Body Style',      val: buildBodyStyle(r) },
-    { label:'Drive Type',      val: gv(r,'DriveType') },
+    { label:'Drive Type',      val: buildDriveType(r) },
     { label:'Fuel Type',       val: gv(r,'FuelTypePrimary') },
     { label:'Engine',          val: buildEngine(r) },
     { label:'Transmission',    val: gv(r,'TransmissionStyle') },
@@ -1030,6 +1030,18 @@ function buildEngine(r) {
   if (turbo && turbo.toLowerCase().includes('yes')) parts.push('Turbocharged');
   if (hp) parts.push(hp+' HP');
   return parts.length ? parts.join(' · ') : null;
+}
+
+function buildDriveType(r) {
+  var raw = gv(r, 'DriveType');
+  if (!raw) return null;
+  var s = raw.toLowerCase();
+  if (s.includes('awd') || s.includes('all-wheel') || s.includes('all wheel')) return 'AWD';
+  if (s.includes('4wd') || s.includes('four-wheel') || s.includes('four wheel') || s.includes('4-wheel')) return '4WD';
+  if (s.includes('fwd') || s.includes('front-wheel') || s.includes('front wheel')) return 'FWD';
+  if (s.includes('rwd') || s.includes('rear-wheel') || s.includes('rear wheel')) return 'RWD';
+  if (s.includes('2wd') || s.includes('two-wheel') || s.includes('two wheel')) return '2WD';
+  return raw;
 }
 
 function buildBodyStyle(r) {
