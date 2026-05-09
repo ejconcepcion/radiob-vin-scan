@@ -569,7 +569,7 @@
     </div>
   </div>
 
-  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.9.0</footer>
+  <footer>Powered by NHTSA VPIC API &nbsp;·&nbsp; v0.9.1</footer>
 </div>
 
 <script>
@@ -1035,29 +1035,21 @@ function buildEngine(r) {
 function buildBodyStyle(r) {
   var raw = gv(r, 'BodyClass');
   if (!raw) return null;
-  var map = {
-    'sedan/saloon': 'Sedan',
-    'sedan': 'Sedan',
-    'sport utility vehicle (suv)': 'SUV',
-    'sport utility vehicle': 'SUV',
-    'suv': 'SUV',
-    'pickup': 'Pickup',
-    'pickup truck': 'Pickup',
-    'hatchback/liftback/notchback': 'Hatchback',
-    'hatchback': 'Hatchback',
-    'coupe': 'Coupe',
-    'convertible/cabriolet': 'Convertible',
-    'convertible': 'Convertible',
-    'minivan': 'Minivan',
-    'van': 'Van',
-    'cargo van': 'Cargo Van',
-    'wagon': 'Wagon',
-    'station wagon': 'Wagon',
-    'crossover utility vehicle (cuv)': 'CUV',
-    'roadster': 'Roadster',
-    'low speed vehicle (lsv)': 'LSV',
-  };
-  return map[raw.toLowerCase()] || raw;
+  var s = raw.toLowerCase();
+  if (s.includes('cargo van'))                          return 'Cargo Van';
+  if (s.includes('minivan'))                            return 'Minivan';
+  if (s.includes('van'))                                return 'Van';
+  if (s.includes('pickup'))                             return 'Pickup';
+  if (s.includes('crossover'))                          return 'CUV';
+  if (s.includes('suv') || s.includes('sport utility')) return 'SUV';
+  if (s.includes('hatchback'))                          return 'Hatchback';
+  if (s.includes('convertible') || s.includes('cabriolet')) return 'Convertible';
+  if (s.includes('roadster'))                           return 'Roadster';
+  if (s.includes('coupe'))                              return 'Coupe';
+  if (s.includes('wagon'))                              return 'Wagon';
+  if (s.includes('sedan') || s.includes('saloon'))      return 'Sedan';
+  if (s.includes('low speed'))                          return 'LSV';
+  return raw;
 }
 
 function buildPlant(r) {
