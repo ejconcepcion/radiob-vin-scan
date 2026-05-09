@@ -972,6 +972,9 @@ function showVehicleResult(vin, r) {
     { label:'🖥️ Modules', term:'OEM module' },
   ];
 
+  var isMercedes = /mercedes/i.test(make);
+  if (isMercedes) parts.push({ label:'💺 Headrest', term:'headrest OEM' });
+
   var partButtons = parts.map(function(p) {
     var t = p.term.replace(/'/g,"\\'");
     return '<div class="part-row">' +
